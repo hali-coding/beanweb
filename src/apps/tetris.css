@@ -1,0 +1,196 @@
+.tetris {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  background: var(--panel);
+  /* The preview is a constant swatch, not a scaled copy of the board. */
+  --preview-cell: 16px;
+}
+
+.tetris-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  gap: 8px;
+  padding: 6px;
+  /* The board grows with the window but the panel does not, so centre the pair
+     rather than letting it hug the left edge of a zoomed window. */
+  justify-content: center;
+}
+
+/* ------------------------------------------------------------- the well */
+.tetris-well {
+  position: relative;
+  flex: 0 1 auto;
+  height: 100%;
+  /* 10 columns by 20 rows, so the well is always half as wide as it is tall. */
+  aspect-ratio: 1 / 2;
+  /* On a tall narrow window the height would ask for more width than the fixed
+     side panel leaves over; clamping lets aspect-ratio shrink the well
+     proportionally instead of squashing the cells out of square. */
+  max-width: 100%;
+  background: #2e2e2e;
+  padding: 1px;
+  box-shadow:
+    inset var(--hairline) var(--hairline) 0 0 var(--panel-darken-3),
+    inset calc(-1 * var(--hairline)) calc(-1 * var(--hairline)) 0 0 var(--panel-lighten-max),
+    inset calc(2 * var(--hairline)) calc(2 * var(--hairline)) 0 0 var(--panel-darken-2),
+    inset calc(-2 * var(--hairline)) calc(-2 * var(--hairline)) 0 0 var(--panel-lighten-1);
+}
+
+.tetris-field {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  grid-template-columns: repeat(10, 1fr);
+  grid-template-rows: repeat(20, 1fr);
+  /* The gap is the grid line: the well's colour shows through. */
+  gap: 1px;
+}
+
+.tetris-cell {
+  background: #161616;
+  min-width: 0;
+  min-height: 0;
+}
+
+/* --------------------------------------------------------- piece colours
+   Muted a shade off the arcade primaries so they sit against R5 grey rather
+   than vibrating against it. Every block gets the same bevel the widgets use,
+   which is what makes them read as BeOS blocks and not flat squares. */
+.tetris-cell[data-kind] {
+  box-shadow:
+    inset 1px 1px 0 rgba(255, 255, 255, 0.45),
+    inset -1px -1px 0 rgba(0, 0, 0, 0.38);
+}
+.tetris-cell[data-kind='I'] { background: #35b6c6; }
+.tetris-cell[data-kind='O'] { background: #e5b53a; }
+.tetris-cell[data-kind='T'] { background: #9b5fb8; }
+.tetris-cell[data-kind='S'] { background: #5fa951; }
+.tetris-cell[data-kind='Z'] { background: #cf5046; }
+.tetris-cell[data-kind='J'] { background: #4b74c4; }
+.tetris-cell[data-kind='L'] { background: #db8534; }
+
+/* The landing shadow: same hue, drawn as an outline so it never reads as a
+   settled block. */
+.tetris-cell[data-ghost] {
+  background: #161616;
+  box-shadow: inset 0 0 0 1px currentColor;
+  opacity: 0.55;
+}
+.tetris-cell[data-ghost][data-kind='I'] { color: #35b6c6; }
+.tetris-cell[data-ghost][data-kind='O'] { color: #e5b53a; }
+.tetris-cell[data-ghost][data-kind='T'] { color: #9b5fb8; }
+.tetris-cell[data-ghost][data-kind='S'] { color: #5fa951; }
+.tetris-cell[data-ghost][data-kind='Z'] { color: #cf5046; }
+.tetris-cell[data-ghost][data-kind='J'] { color: #4b74c4; }
+.tetris-cell[data-ghost][data-kind='L'] { color: #db8534; }
+
+.tetris-overlay {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: rgba(0, 0, 0, 0.55);
+}
+.tetris-overlay-text {
+  padding: 5px 10px;
+  background: var(--panel);
+  font-size: var(--fs-plain);
+  box-shadow:
+    inset var(--hairline) var(--hairline) 0 0 var(--panel-lighten-max),
+    inset calc(-1 * var(--hairline)) calc(-1 * var(--hairline)) 0 0 var(--panel-darken-3);
+}
+
+/* ------------------------------------------------------------ side panel */
+/* Fixed width, like the Deskbar. Left to grow, it would absorb every pixel the
+   well does not claim, and the preview inside it would grow to match. */
+.tetris-side {
+  flex: none;
+  width: 116px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.tetris-box { margin-top: 6px; padding: 10px 8px 8px; }
+
+.tetris-preview {
+  display: grid;
+  /* Fixed tracks, sized by content: 4x16 + 3 gap + 2 padding = 69px square. */
+  grid-template-columns: repeat(4, var(--preview-cell));
+  grid-template-rows: repeat(4, var(--preview-cell));
+  gap: 1px;
+  width: max-content;
+  margin: 0 auto;
+  background: #2e2e2e;
+  padding: 1px;
+}
+
+.tetris-stats {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 2px 8px;
+  margin: 0;
+  font-size: var(--fs-plain);
+}
+.tetris-stats dt { color: var(--panel-darken-4); }
+.tetris-stats dd {
+  margin: 0;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Options and buttons cluster at the bottom of the panel; the auto margin sits
+   on the first of the pair so they stay together. */
+.tetris-options {
+  margin-top: auto;
+  font-size: var(--fs-plain);
+}
+
+.tetris-buttons {
+  margin-top: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.tetris-buttons .b-button { min-width: 0; width: 100%; }
+
+/* --------------------------------------------------------- touch controls */
+.tetris-pad { display: none; }
+
+@media (pointer: coarse) {
+  .tetris { --preview-cell: 18px; }
+
+  .tetris-pad {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 4px;
+    padding: 0 6px 6px;
+    flex: none;
+  }
+  .tetris-pad .b-button {
+    min-width: 0;
+    height: 38px;
+    font-size: 16px;
+    line-height: 1;
+  }
+}
+
+.tetris-status {
+  flex: none;
+  height: 17px;
+  display: flex;
+  align-items: center;
+  padding: 0 6px;
+  font-size: var(--fs-small);
+  color: var(--panel-darken-4);
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+/* The hint line is keyboard-only advice; hide it where there is no keyboard. */
+@media (pointer: coarse) {
+  .tetris-status { display: none; }
+}

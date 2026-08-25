@@ -1,0 +1,201 @@
+/* ==========================================================================
+   Window manager
+   An R5 window is a frame with a *partial-width* tab sitting on its top edge.
+   The area beside the tab is transparent, which is the single most
+   recognisable thing about the look, so .b-window itself paints nothing.
+   ========================================================================== */
+
+.b-window-layer {
+  position: absolute;
+  inset: 0;
+  z-index: var(--z-windows);
+  /* The layer is a pass-through; only windows themselves take pointer events. */
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.b-window {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: flex;
+  flex-direction: column;
+  pointer-events: auto;
+  background: transparent;
+  /* Position lives in the transform so drags never touch layout. */
+  will-change: transform;
+  contain: layout style;
+}
+
+.b-window--dragging,
+.b-window--resizing {
+  /* Promote to its own layer for the duration of the gesture only. */
+  will-change: transform, width, height;
+}
+.b-window--dragging * { pointer-events: none !important; }
+
+.b-window--minimized { display: none; }
+
+/* ------------------------------------------------------------- the tab */
+.b-window-tabrow {
+  display: flex;
+  height: var(--tab-height);
+  flex: none;
+  /* Transparent beside the tab -- see through to whatever is behind. The row
+     must also be click-through there, or an invisible full-width strip would
+     swallow clicks meant for the window underneath. */
+  background: transparent;
+  pointer-events: none;
+}
+.b-window-tab { pointer-events: auto; }
+
+.b-window-tab {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  height: 100%;
+  max-width: 100%;
+  padding: 0 7px;
+  background: var(--tab-inactive);
+  color: var(--tab-text-inactive);
+  cursor: default;
+  touch-action: none;
+  box-shadow:
+    inset var(--hairline) var(--hairline) 0 0 var(--tab-inactive-lite),
+    inset calc(-1 * var(--hairline)) 0 0 0 var(--tab-inactive-dark);
+}
+
+.b-window--active .b-window-tab {
+  background: var(--tab-active);
+  color: var(--tab-text);
+  box-shadow:
+    inset var(--hairline) var(--hairline) 0 0 var(--tab-active-lite),
+    inset calc(-1 * var(--hairline)) 0 0 0 var(--tab-active-dark);
+}
+
+.b-window-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--fs-plain);
+  line-height: 1;
+}
+
+/* Close box: a small raised square. Zoom box: a square holding a smaller one. */
+.b-window-widget {
+  position: relative;
+  width: 12px;
+  height: 12px;
+  flex: none;
+  padding: 0;
+  border: none;
+  background: inherit;
+  cursor: default;
+  box-shadow:
+    inset var(--hairline) var(--hairline) 0 0 rgba(255, 255, 255, 0.85),
+    inset calc(-1 * var(--hairline)) calc(-1 * var(--hairline)) 0 0 rgba(0, 0, 0, 0.42);
+}
+.b-window-widget:active {
+  box-shadow:
+    inset var(--hairline) var(--hairline) 0 0 rgba(0, 0, 0, 0.42),
+    inset calc(-1 * var(--hairline)) calc(-1 * var(--hairline)) 0 0 rgba(255, 255, 255, 0.85);
+}
+.b-window-zoom::after {
+  content: "";
+  position: absolute;
+  inset: 3px;
+  box-shadow:
+    inset var(--hairline) var(--hairline) 0 0 rgba(255, 255, 255, 0.85),
+    inset calc(-1 * var(--hairline)) calc(-1 * var(--hairline)) 0 0 rgba(0, 0, 0, 0.42);
+}
+
+/* ----------------------------------------------------------- the frame */
+.b-window-frame {
+  /* The resize handles are absolute children of the frame and must anchor to
+     it, not to the window box the tab row also occupies. */
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding: var(--frame-border);
+  padding-top: calc(var(--frame-border) - 1px);
+  background: var(--panel);
+  box-shadow:
+    inset var(--hairline) var(--hairline) 0 0 var(--panel-lighten-max),
+    inset calc(-1 * var(--hairline)) calc(-1 * var(--hairline)) 0 0 var(--panel-darken-3),
+    inset calc(2 * var(--hairline)) calc(2 * var(--hairline)) 0 0 var(--panel-lighten-1),
+    inset calc(-2 * var(--hairline)) calc(-2 * var(--hairline)) 0 0 var(--panel-darken-2),
+    3px 3px 0 0 rgba(0, 0, 0, 0.20);
+}
+.b-window--active .b-window-frame {
+  box-shadow:
+    inset var(--hairline) var(--hairline) 0 0 var(--panel-lighten-max),
+    inset calc(-1 * var(--hairline)) calc(-1 * var(--hairline)) 0 0 var(--panel-darken-3),
+    inset calc(2 * var(--hairline)) calc(2 * var(--hairline)) 0 0 var(--panel-lighten-1),
+    inset calc(-2 * var(--hairline)) calc(-2 * var(--hairline)) 0 0 var(--panel-darken-2),
+    4px 4px 0 0 rgba(0, 0, 0, 0.28);
+}
+
+.b-window-content {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--panel);
+  overflow: hidden;
+  /* Keep app repaints inside the window. */
+  contain: layout paint style;
+}
+
+/* --------------------------------------------------------- resize grip */
+.b-window-resize {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 18px;
+  height: 18px;
+  cursor: nwse-resize;
+  touch-action: none;
+  /* R5 draws three diagonal hatches in the corner. */
+  background-image: repeating-linear-gradient(
+    135deg,
+    var(--panel-darken-3) 0 var(--hairline),
+    transparent var(--hairline) 3px
+  );
+  background-position: 4px 4px;
+  background-size: 11px 11px;
+  background-repeat: no-repeat;
+}
+.b-window--edge-locked .b-window-resize { display: none; }
+
+/* Invisible edge handles, wider than the visible border so they are grabbable. */
+.b-resize-edge { position: absolute; touch-action: none; }
+/* Kept inside the frame so it cannot overlap the tab and turn a window drag
+   into a resize. */
+.b-resize-edge--n { top: 0; left: 0; right: 0; height: 8px; cursor: ns-resize; }
+.b-resize-edge--s { bottom: 0; left: 0; right: 18px; height: 8px; cursor: ns-resize; }
+.b-resize-edge--w { top: 0; bottom: 0; left: 0; width: 8px; cursor: ew-resize; }
+.b-resize-edge--e { top: 0; bottom: 18px; right: 0; width: 8px; cursor: ew-resize; }
+
+/* =======================================================================
+   Mobile: the window manager collapses to one full-bleed window at a time.
+   The tab stays (it is the whole point) but drag/resize are disabled and
+   the frame fills the workspace.
+   ======================================================================= */
+@media (max-width: 767px) {
+  .b-window {
+    transform: none !important;
+    inset: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+  }
+  .b-window:not(.b-window--front) { display: none; }
+  .b-window-tabrow { background: var(--panel-darken-2); }
+  .b-window-tab { flex: 1 1 auto; }
+  .b-window-frame {
+    padding: 2px;
+    box-shadow: none;
+  }
+  .b-window-resize, .b-resize-edge { display: none; }
+}

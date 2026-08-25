@@ -1,0 +1,66 @@
+.term {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  background: #101010;
+  box-shadow:
+    inset var(--hairline) var(--hairline) 0 0 var(--panel-darken-3),
+    inset calc(-1 * var(--hairline)) calc(-1 * var(--hairline)) 0 0 var(--panel-lighten-max);
+}
+
+.term-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: 4px 6px;
+  /* R5 terminals were dark on a light desktop; the amber cast is deliberate. */
+  color: #e6e6e6;
+  font-family: var(--font-fixed);
+  font-size: 12px;
+  line-height: 15px;
+  scrollbar-color: #3a3a3a #1b1b1b;
+}
+.term-scroll::-webkit-scrollbar { background: #1b1b1b; }
+.term-scroll::-webkit-scrollbar-track { background: #1b1b1b; box-shadow: none; }
+.term-scroll::-webkit-scrollbar-thumb {
+  background: #3a3a3a;
+  background-image: none;
+  box-shadow:
+    inset var(--hairline) var(--hairline) 0 0 #585858,
+    inset calc(-1 * var(--hairline)) calc(-1 * var(--hairline)) 0 0 #101010;
+}
+.term-scroll::-webkit-scrollbar-button:single-button { background-color: #2a2a2a; box-shadow: none; }
+
+.term-line {
+  margin: 0;
+  font: inherit;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.term-line--echo { color: #ffc900; }
+.term-line--err { color: #ff8a7a; }
+
+.term-prompt {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+.term-cwd {
+  flex: none;
+  color: #ffc900;
+  white-space: nowrap;
+}
+.term-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  background: transparent;
+  border: none;
+  outline: none;
+  padding: 0;
+  color: #e6e6e6;
+  font: inherit;
+  caret-color: #5ee06a;
+}
+
+@media (pointer: coarse) {
+  .term-scroll { font-size: 13px; line-height: 18px; }
+}

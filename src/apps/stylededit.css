@@ -1,0 +1,41 @@
+.sedit {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  background: var(--panel);
+}
+
+.sedit-area {
+  flex: 1 1 auto;
+  min-height: 0;
+  margin: 4px;
+  padding: 6px 8px;
+  border: none;
+  outline: none;
+  resize: none;
+  background: var(--document);
+  color: var(--document-text);
+  box-shadow:
+    inset var(--hairline) var(--hairline) 0 0 var(--panel-darken-3),
+    inset calc(-1 * var(--hairline)) calc(-1 * var(--hairline)) 0 0 var(--panel-lighten-max),
+    inset calc(2 * var(--hairline)) calc(2 * var(--hairline)) 0 0 var(--panel-darken-2),
+    inset calc(-2 * var(--hairline)) calc(-2 * var(--hairline)) 0 0 var(--panel-lighten-1);
+}
+.sedit-area:focus {
+  outline: calc(2 * var(--hairline)) solid var(--navigation);
+  outline-offset: -1px;
+}
+
+.sedit-status {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 17px;
+  padding: 0 6px;
+  font-size: var(--fs-small);
+  color: var(--panel-darken-4);
+  overflow: hidden;
+  white-space: nowrap;
+}

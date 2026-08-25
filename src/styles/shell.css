@@ -1,0 +1,354 @@
+/* ==========================================================================
+   Desktop shell: root surface, desktop icons, Deskbar
+   ========================================================================== */
+
+.b-desktop {
+  position: fixed;
+  inset: 0;
+  background: var(--desktop);
+  overflow: hidden;
+  isolation: isolate;
+}
+
+.b-workspace {
+  position: absolute;
+  inset: 0;
+}
+
+/* ------------------------------------------------------- desktop icons */
+.b-desktop-icons {
+  position: absolute;
+  inset: 0;
+  z-index: var(--z-icons);
+  pointer-events: none;
+}
+
+.b-desktop-icon {
+  position: absolute;
+  width: 72px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  pointer-events: auto;
+  cursor: default;
+  touch-action: none;
+  background: none;
+  border: none;
+  color: #fff;
+}
+.b-desktop-icon-glyph {
+  width: 32px;
+  height: 32px;
+  flex: none;
+  /* Icons are drawn as SVG; the drop shadow separates them from any wallpaper. */
+  filter: drop-shadow(1px 1px 0 rgba(0, 0, 0, 0.45));
+}
+.b-desktop-icon-label {
+  max-width: 100%;
+  padding: 0 3px;
+  font-size: var(--fs-plain);
+  line-height: 14px;
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-shadow: 1px 1px 0 rgba(0, 0, 0, 0.65);
+}
+.b-desktop-icon[data-selected="true"] .b-desktop-icon-label {
+  background: var(--list-selected);
+  color: #000;
+  text-shadow: none;
+}
+.b-desktop-icon[data-selected="true"] .b-desktop-icon-glyph {
+  filter: drop-shadow(1px 1px 0 rgba(0, 0, 0, 0.45)) brightness(1.18);
+}
+
+/* -------------------------------------------------------------- Deskbar
+   R5 docks the Deskbar top-right: logo tab, then the tray (clock), then the
+   list of running applications. */
+.b-deskbar {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: var(--deskbar-width);
+  max-height: 100%;
+  display: flex;
+  flex-direction: column;
+  z-index: var(--z-deskbar);
+  background: var(--panel);
+  box-shadow:
+    inset var(--hairline) var(--hairline) 0 0 var(--panel-lighten-max),
+    inset calc(-1 * var(--hairline)) calc(-1 * var(--hairline)) 0 0 var(--panel-darken-3),
+    -2px 2px 0 0 rgba(0, 0, 0, 0.25);
+}
+
+.b-deskbar-logo {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  height: 26px;
+  padding: 0 6px;
+  flex: none;
+  background: var(--tab-active);
+  border: none;
+  cursor: default;
+  color: #000;
+  box-shadow:
+    inset var(--hairline) var(--hairline) 0 0 var(--tab-active-lite),
+    inset calc(-1 * var(--hairline)) calc(-1 * var(--hairline)) 0 0 var(--tab-active-dark);
+}
+.b-deskbar-logo[data-open="true"] {
+  box-shadow:
+    inset var(--hairline) var(--hairline) 0 0 var(--tab-active-dark),
+    inset calc(-1 * var(--hairline)) calc(-1 * var(--hairline)) 0 0 var(--tab-active-lite);
+}
+.b-deskbar-logo-text {
+  font-weight: 700;
+  font-size: var(--fs-plain);
+  letter-spacing: 0.02em;
+}
+
+.b-deskbar-tray {
+  flex: none;
+  padding: 4px 6px 5px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  box-shadow: inset 0 calc(-1 * var(--hairline)) 0 0 var(--panel-darken-2);
+}
+.b-deskbar-clock {
+  font-size: var(--fs-plain);
+  line-height: 14px;
+  font-variant-numeric: tabular-nums;
+  cursor: default;
+}
+.b-deskbar-date {
+  font-size: var(--fs-small);
+  line-height: 12px;
+  color: var(--panel-darken-3);
+}
+
+.b-deskbar-apps {
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: 3px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.b-deskbar-app {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  height: 22px;
+  padding: 0 5px;
+  border: none;
+  background: transparent;
+  cursor: default;
+  text-align: left;
+  color: #000;
+  overflow: hidden;
+}
+.b-deskbar-app[data-active="true"] {
+  box-shadow:
+    inset var(--hairline) var(--hairline) 0 0 var(--panel-lighten-max),
+    inset calc(-1 * var(--hairline)) calc(-1 * var(--hairline)) 0 0 var(--panel-darken-3);
+}
+.b-deskbar-app-icon { width: 16px; height: 16px; flex: none; }
+.b-deskbar-app-name {
+  font-size: var(--fs-small);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ------------------------------------------------------------- Mobile
+   The Deskbar becomes a bottom dock, which is the only sane place for a
+   thumb, and the running-apps list turns into a horizontal strip. */
+@media (max-width: 767px) {
+  .b-deskbar {
+    top: auto;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    width: 100%;
+    flex-direction: row;
+    align-items: stretch;
+    height: calc(46px + env(safe-area-inset-bottom, 0px));
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    box-shadow:
+      inset 0 var(--hairline) 0 0 var(--panel-lighten-max),
+      0 -2px 0 0 rgba(0, 0, 0, 0.25);
+  }
+  .b-deskbar-logo { height: auto; width: 54px; justify-content: center; }
+  .b-deskbar-tray {
+    order: 3;
+    justify-content: center;
+    padding: 0 8px;
+    box-shadow: inset var(--hairline) 0 0 0 var(--panel-darken-2);
+  }
+  .b-deskbar-apps {
+    flex-direction: row;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding: 3px;
+    gap: 3px;
+  }
+  .b-deskbar-app { height: 100%; flex: none; padding: 0 8px; }
+  .b-deskbar-app-name { display: none; }
+  .b-deskbar-app-icon { width: 24px; height: 24px; }
+
+  /* Icons get out of the way of the single full-screen window. */
+  .b-desktop-icons { bottom: 46px; }
+}
+
+/* ------------------------------------------------------------- Alerts */
+.b-alert-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-alert);
+  display: grid;
+  place-items: center;
+  background: rgba(0, 0, 0, 0.18);
+  padding: 16px;
+}
+.b-alert {
+  width: min(420px, 100%);
+  background: var(--panel);
+  box-shadow:
+    inset var(--hairline) var(--hairline) 0 0 var(--panel-lighten-max),
+    inset calc(-1 * var(--hairline)) calc(-1 * var(--hairline)) 0 0 var(--panel-darken-3),
+    4px 4px 0 0 rgba(0, 0, 0, 0.3);
+  display: flex;
+  flex-direction: column;
+}
+.b-alert-body { display: flex; gap: 12px; padding: 14px; }
+.b-alert-icon { width: 32px; height: 32px; flex: none; }
+.b-alert-text { font-size: var(--fs-plain); line-height: 16px; white-space: pre-wrap; }
+.b-alert-buttons {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 0 14px 14px;
+}
+
+/* ------------------------------------------------------------- Boot */
+.b-boot {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  display: grid;
+  place-items: center;
+  background: var(--desktop);
+  color: #fff;
+  gap: 12px;
+  animation: b-boot-out 400ms ease 900ms forwards;
+}
+@keyframes b-boot-out {
+  to { opacity: 0; visibility: hidden; }
+}
+
+/* ------------------------------------------------------- BFilePanel (save) */
+.savepanel {
+  width: min(400px, 100%);
+  max-height: min(440px, 100%);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  background: var(--panel);
+  box-shadow:
+    inset var(--hairline) var(--hairline) 0 0 var(--panel-lighten-max),
+    inset calc(-1 * var(--hairline)) calc(-1 * var(--hairline)) 0 0 var(--panel-darken-3),
+    4px 4px 0 0 rgba(0, 0, 0, 0.3);
+}
+
+.savepanel-nav {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+}
+.savepanel-up {
+  min-width: 0;
+  width: 24px;
+  height: 20px;
+  padding: 0;
+  font-size: 9px;
+  line-height: 1;
+}
+.savepanel-dir {
+  flex: 1 1 auto;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  padding: 0 5px;
+  background: var(--document);
+  font-size: var(--fs-small);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  direction: rtl; /* keep the deepest folder visible when the path overflows */
+  text-align: left;
+  box-shadow:
+    inset var(--hairline) var(--hairline) 0 0 var(--panel-darken-3),
+    inset calc(-1 * var(--hairline)) calc(-1 * var(--hairline)) 0 0 var(--panel-lighten-max);
+}
+
+.savepanel-list {
+  flex: 1 1 auto;
+  min-height: 120px;
+  background: var(--document);
+  box-shadow:
+    inset var(--hairline) var(--hairline) 0 0 var(--panel-darken-3),
+    inset calc(-1 * var(--hairline)) calc(-1 * var(--hairline)) 0 0 var(--panel-lighten-max);
+}
+.savepanel-empty {
+  margin: 0;
+  padding: 10px;
+  color: var(--panel-darken-3);
+  font-style: italic;
+}
+.savepanel-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  height: 20px;
+  padding: 0 6px;
+  border: none;
+  background: transparent;
+  text-align: left;
+  cursor: default;
+  color: #000;
+}
+.savepanel-row:hover { background: var(--panel-lighten-2); }
+.savepanel-row[data-dim='true'] { color: var(--panel-darken-3); }
+.savepanel-row-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.savepanel-name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+}
+.savepanel-name label { flex: none; }
+.savepanel-name .b-textcontrol { flex: 1 1 auto; min-width: 0; }
+
+.savepanel-buttons {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  flex: none;
+}
+
+@media (pointer: coarse) {
+  .savepanel-row { height: 30px; }
+}

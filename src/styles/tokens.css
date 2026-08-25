@@ -1,0 +1,96 @@
+/*
+ * BeOS R5 design tokens.
+ *
+ * The greys are not hand-picked: R5 derives every shade from the panel colour
+ * (216,216,216) using tint_color(), which is
+ *     tint <  1.0 -> 255 - (255 - c) * tint      (lighten)
+ *     tint >= 1.0 -> c * (2 - tint)              (darken)
+ * The B_*_TINT constants below are the real ones, so the ramp matches R5.
+ */
+:root {
+  /* --- panel ramp, from tint_color(216, B_*_TINT) --- */
+  --panel:            #d8d8d8;             /* B_PANEL_BACKGROUND_COLOR      */
+  --panel-lighten-max:#ffffff;             /* tint 0.000                    */
+  --panel-lighten-2:  #e4e4e4;             /* tint 0.700                    */
+  --panel-lighten-1:  #dedede;             /* tint 0.833                    */
+  --panel-darken-1:   #c9c9c9;             /* tint 1.070                    */
+  --panel-darken-2:   #b5b5b5;             /* tint 1.162                    */
+  --panel-darken-3:   #838383;             /* tint 1.393                    */
+  --panel-darken-4:   #515151;             /* tint 1.626                    */
+  --panel-darken-max: #000000;             /* tint 2.000                    */
+
+  /* --- window tabs --- */
+  --tab-active:       #ffc900;             /* B_WINDOW_TAB_COLOR (255,203,0) */
+  --tab-active-lite:  #ffe066;
+  --tab-active-dark:  #d9ab00;
+  --tab-inactive:     #e8e8e8;             /* B_WINDOW_INACTIVE_TAB_COLOR    */
+  --tab-inactive-lite:#f4f4f4;
+  --tab-inactive-dark:#bcbcbc;
+  --tab-text:         #000000;
+  --tab-text-inactive:#6a6a6a;
+
+  /* --- documents, lists, text --- */
+  --document:         #ffffff;             /* B_DOCUMENT_BACKGROUND_COLOR   */
+  --document-text:    #000000;
+  --list-bg:          #ffffff;
+  --list-selected:    #aab8d6;             /* Tracker's blue-lavender       */
+  --list-selected-text:#000000;
+  --text-selection:   #b4c8e8;
+
+  /* --- accents --- */
+  --navigation:       #0000e5;             /* B_KEYBOARD_NAVIGATION_COLOR   */
+  --desktop:          #336698;             /* default workspace colour      */
+  --shine:            #ffffff;
+  --shadow:           #838383;
+
+  /* --- success/failure/alert stripes --- */
+  --alert-stop:       #cc3333;
+  --alert-warn:       #e8a020;
+  --alert-info:       #3366cc;
+
+  /* --- metrics (R5 is a 12px-plain-font desktop) --- */
+  --font-plain: "Bitstream Vera Sans", "DejaVu Sans", "Noto Sans", "Segoe UI", system-ui, sans-serif;
+  --font-fixed: "Bitstream Vera Sans Mono", "DejaVu Sans Mono", "Consolas", "Courier New", monospace;
+  --fs-plain: 12px;
+  --fs-small: 10px;
+  --lh-plain: 15px;
+
+  --tab-height: 21px;
+  --frame-border: 5px;
+  --scrollbar-size: 15px;
+  --menubar-height: 19px;
+  --deskbar-width: 92px;
+
+  /*
+   * Hairline: R5 bevels are exactly one *device* pixel. On a 2x/3x display a
+   * 1px CSS border is 2-3 device pixels and the widgets read as fat and soft,
+   * so we shrink the hairline as density rises. Kept as a variable rather than
+   * hard-coded so every widget stays consistent.
+   */
+  --hairline: 1px;
+
+  /* Stacking ladder. .b-window-layer sits at --z-windows and establishes a
+     stacking context, so per-window z values from the store compete only with
+     each other and can never climb over the Deskbar or a menu. */
+  --z-icons: 10;
+  --z-windows: 100;
+  --z-deskbar: 9500;
+  --z-menu: 9800;
+  --z-alert: 9900;
+}
+
+@media (min-resolution: 1.5dppx) {
+  :root { --hairline: 0.5px; }
+}
+@media (min-resolution: 2.5dppx) {
+  :root { --hairline: 0.34px; }
+}
+
+/* Touch devices get larger hit targets without changing the visual metrics. */
+@media (pointer: coarse) {
+  :root {
+    --scrollbar-size: 20px;
+    --tab-height: 26px;
+    --frame-border: 7px;
+  }
+}

@@ -1,0 +1,54 @@
+name: PR review tests
+
+# Runs on PR creation and on every push to an open PR, plus pushes to main so
+# the default branch is always known-good.
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+# A new push to the same PR cancels the previous run rather than queueing behind it.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Typecheck, test, build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          # Matches the Node the project is developed against.
+          node-version: '24'
+          cache: npm
+
+      # `ci` not `install`: fails loudly if package-lock.json is out of step
+      # with package.json instead of silently resolving something different.
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Test
+        run: npm test
+
+      # Last, because it is the slowest and a type or test failure should
+      # surface first.
+      - name: Build
+        run: npm run build
+
+      - name: Upload build output
+        if: success()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # 7.0.1
+        with:
+          name: dist
+          path: dist
+          retention-days: 7

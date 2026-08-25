@@ -1,0 +1,141 @@
+.tracker {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  background: var(--panel);
+}
+
+.tracker-locbar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 5px;
+  flex: none;
+}
+.tracker-up {
+  min-width: 0;
+  width: 24px;
+  height: 20px;
+  padding: 0;
+  font-size: 9px;
+  line-height: 1;
+}
+.tracker-path {
+  flex: 1 1 auto;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  padding: 0 5px;
+  background: var(--document);
+  font-size: var(--fs-small);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  box-shadow:
+    inset var(--hairline) var(--hairline) 0 0 var(--panel-darken-3),
+    inset calc(-1 * var(--hairline)) calc(-1 * var(--hairline)) 0 0 var(--panel-lighten-max);
+}
+
+.tracker-view {
+  flex: 1 1 auto;
+  min-height: 0;
+  background: var(--document);
+  box-shadow:
+    inset var(--hairline) var(--hairline) 0 0 var(--panel-darken-3),
+    inset calc(-1 * var(--hairline)) calc(-1 * var(--hairline)) 0 0 var(--panel-lighten-max);
+}
+
+.tracker-view--icon {
+  display: flex;
+  flex-wrap: wrap;
+  align-content: flex-start;
+  gap: 4px;
+  padding: 8px;
+}
+
+.tracker-empty {
+  margin: 0;
+  padding: 14px;
+  color: var(--panel-darken-3);
+  font-style: italic;
+}
+
+.tracker-icon {
+  width: 78px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 5px 3px;
+  background: none;
+  border: none;
+  cursor: default;
+  color: #000;
+}
+.tracker-icon-label {
+  max-width: 100%;
+  padding: 0 3px;
+  font-size: var(--fs-plain);
+  line-height: 14px;
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tracker-icon[data-selected='true'] .tracker-icon-label {
+  background: var(--list-selected);
+}
+
+/* -------------------------------------------------------------- list view */
+.tracker-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--fs-plain);
+}
+.tracker-table th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  text-align: left;
+  font-weight: 400;
+  height: 18px;
+  padding: 0 6px;
+  background: var(--panel);
+  box-shadow:
+    inset var(--hairline) var(--hairline) 0 0 var(--panel-lighten-max),
+    inset calc(-1 * var(--hairline)) calc(-1 * var(--hairline)) 0 0 var(--panel-darken-3);
+  white-space: nowrap;
+}
+.tracker-table td {
+  height: 18px;
+  padding: 0 6px;
+  white-space: nowrap;
+}
+.tracker-table tbody tr[data-selected='true'] { background: var(--list-selected); }
+.tracker-cell-name { display: inline-flex; align-items: center; gap: 6px; }
+
+/* On a phone the Modified column is noise; size stays useful. */
+@media (max-width: 480px) {
+  .tracker-table th:nth-child(3),
+  .tracker-table td:nth-child(3) { display: none; }
+}
+
+.tracker-status {
+  flex: none;
+  height: 17px;
+  display: flex;
+  align-items: center;
+  padding: 0 6px;
+  font-size: var(--fs-small);
+  color: #000;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Coarse pointers get bigger targets; double-click still works via tap-tap. */
+@media (pointer: coarse) {
+  .tracker-icon { width: 86px; padding: 9px 3px; }
+  .tracker-table td, .tracker-table th { height: 30px; }
+}

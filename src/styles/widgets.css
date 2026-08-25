@@ -1,0 +1,324 @@
+/* ==========================================================================
+   BeOS R5 widget kit
+   Every widget is built from the same two-step bevel R5 uses: an outer edge
+   (shine top-left / shadow bottom-right) and an inner edge one shade softer.
+   Bevels are drawn with inset box-shadows so they cost nothing to composite
+   and stay exactly --hairline thick at any pixel density.
+   ========================================================================== */
+
+.bevel-raised {
+  box-shadow:
+    inset  var(--hairline)  var(--hairline) 0 0 var(--panel-lighten-max),
+    inset calc(-1 * var(--hairline)) calc(-1 * var(--hairline)) 0 0 var(--panel-darken-3),
+    inset  calc(2 * var(--hairline))  calc(2 * var(--hairline)) 0 0 var(--panel-lighten-1),
+    inset calc(-2 * var(--hairline)) calc(-2 * var(--hairline)) 0 0 var(--panel-darken-2);
+}
+
+.bevel-sunken {
+  box-shadow:
+    inset  var(--hairline)  var(--hairline) 0 0 var(--panel-darken-3),
+    inset calc(-1 * var(--hairline)) calc(-1 * var(--hairline)) 0 0 var(--panel-lighten-max),
+    inset  calc(2 * var(--hairline))  calc(2 * var(--hairline)) 0 0 var(--panel-darken-2),
+    inset calc(-2 * var(--hairline)) calc(-2 * var(--hairline)) 0 0 var(--panel-lighten-1);
+}
+
+.bevel-thin-sunken {
+  box-shadow:
+    inset var(--hairline) var(--hairline) 0 0 var(--panel-darken-3),
+    inset calc(-1 * var(--hairline)) calc(-1 * var(--hairline)) 0 0 var(--panel-lighten-max);
+}
+
+/* --------------------------------------------------------------- BButton */
+.b-button {
+  position: relative;
+  min-width: 68px;
+  height: 22px;
+  padding: 0 12px;
+  border: none;
+  border-radius: 3px;
+  background: var(--panel);
+  color: #000;
+  font-size: var(--fs-plain);
+  cursor: default;
+  white-space: nowrap;
+  box-shadow:
+    inset  var(--hairline)  var(--hairline) 0 0 var(--panel-lighten-max),
+    inset calc(-1 * var(--hairline)) calc(-1 * var(--hairline)) 0 0 var(--panel-darken-3),
+    inset  calc(2 * var(--hairline))  calc(2 * var(--hairline)) 0 0 var(--panel-lighten-1),
+    inset calc(-2 * var(--hairline)) calc(-2 * var(--hairline)) 0 0 var(--panel-darken-2);
+}
+.b-button:active:not(:disabled) {
+  box-shadow:
+    inset  var(--hairline)  var(--hairline) 0 0 var(--panel-darken-3),
+    inset calc(-1 * var(--hairline)) calc(-1 * var(--hairline)) 0 0 var(--panel-lighten-max),
+    inset  calc(2 * var(--hairline))  calc(2 * var(--hairline)) 0 0 var(--panel-darken-2),
+    inset calc(-2 * var(--hairline)) calc(-2 * var(--hairline)) 0 0 var(--panel-lighten-1);
+  padding-top: var(--hairline);
+}
+.b-button:disabled { color: var(--panel-darken-2); }
+
+/* R5 marks the default button with a ring outside the button body. */
+.b-button--default {
+  outline: var(--hairline) solid var(--panel-darken-3);
+  outline-offset: 2px;
+}
+.b-button:focus-visible {
+  outline: calc(2 * var(--hairline)) solid var(--navigation);
+  outline-offset: 1px;
+}
+
+/* ------------------------------------------------- BCheckBox / BRadioButton */
+.b-control-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 18px;
+  cursor: default;
+}
+.b-control-row input { position: absolute; opacity: 0; pointer-events: none; }
+
+.b-checkbox-box {
+  width: 12px; height: 12px;
+  flex: none;
+  background: var(--document);
+  box-shadow:
+    inset var(--hairline) var(--hairline) 0 0 var(--panel-darken-3),
+    inset calc(-1 * var(--hairline)) calc(-1 * var(--hairline)) 0 0 var(--panel-lighten-max),
+    inset calc(2 * var(--hairline)) calc(2 * var(--hairline)) 0 0 var(--panel-darken-2),
+    inset calc(-2 * var(--hairline)) calc(-2 * var(--hairline)) 0 0 var(--panel-lighten-1);
+  display: grid; place-items: center;
+}
+/* The R5 check is a solid black square inset in the well, not a tick. */
+.b-checkbox-box::after {
+  content: "";
+  width: 6px; height: 6px;
+  background: transparent;
+}
+input:checked + .b-checkbox-box::after { background: #000; }
+input:focus-visible + .b-checkbox-box { outline: calc(2 * var(--hairline)) solid var(--navigation); outline-offset: 1px; }
+
+.b-radio-dot {
+  width: 12px; height: 12px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--document);
+  box-shadow:
+    inset var(--hairline) var(--hairline) 0 0 var(--panel-darken-3),
+    inset calc(-1 * var(--hairline)) calc(-1 * var(--hairline)) 0 0 var(--panel-lighten-max);
+  display: grid; place-items: center;
+}
+.b-radio-dot::after {
+  content: ""; width: 6px; height: 6px; border-radius: 50%; background: transparent;
+}
+input:checked + .b-radio-dot::after { background: #000; }
+input:focus-visible + .b-radio-dot { outline: calc(2 * var(--hairline)) solid var(--navigation); outline-offset: 1px; }
+
+/* ---------------------------------------------------------- BTextControl */
+.b-textcontrol {
+  height: 20px;
+  padding: 0 4px;
+  background: var(--document);
+  border: none;
+  color: #000;
+  box-shadow:
+    inset var(--hairline) var(--hairline) 0 0 var(--panel-darken-3),
+    inset calc(-1 * var(--hairline)) calc(-1 * var(--hairline)) 0 0 var(--panel-lighten-max),
+    inset calc(2 * var(--hairline)) calc(2 * var(--hairline)) 0 0 var(--panel-darken-2),
+    inset calc(-2 * var(--hairline)) calc(-2 * var(--hairline)) 0 0 var(--panel-lighten-1);
+}
+.b-textcontrol:focus {
+  outline: calc(2 * var(--hairline)) solid var(--navigation);
+  outline-offset: -1px;
+}
+
+/* ------------------------------------------------------------ BMenuBar */
+.b-menubar {
+  display: flex;
+  align-items: stretch;
+  height: var(--menubar-height);
+  background: var(--panel);
+  flex: none;
+  box-shadow: inset 0 calc(-1 * var(--hairline)) 0 0 var(--panel-darken-2);
+}
+.b-menubar-item {
+  display: flex; align-items: center;
+  padding: 0 8px;
+  cursor: default;
+  white-space: nowrap;
+  background: transparent;
+  border: none;
+  color: #000;
+}
+/* R5 highlights a menu title by raising it, not by colouring it. */
+.b-menubar-item[data-open="true"],
+.b-menubar-item:active {
+  box-shadow:
+    inset var(--hairline) var(--hairline) 0 0 var(--panel-lighten-max),
+    inset calc(-1 * var(--hairline)) calc(-1 * var(--hairline)) 0 0 var(--panel-darken-3);
+}
+
+/* --------------------------------------------------------------- BMenu */
+.b-menu {
+  position: fixed;
+  min-width: 150px;
+  padding: 2px;
+  background: var(--panel);
+  z-index: var(--z-menu);
+  box-shadow:
+    inset var(--hairline) var(--hairline) 0 0 var(--panel-lighten-max),
+    inset calc(-1 * var(--hairline)) calc(-1 * var(--hairline)) 0 0 var(--panel-darken-3),
+    2px 2px 0 0 rgba(0, 0, 0, 0.28);
+}
+.b-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  height: 18px;
+  padding: 0 8px;
+  background: transparent;
+  border: none;
+  text-align: left;
+  cursor: default;
+  color: #000;
+  white-space: nowrap;
+}
+.b-menu-item:hover:not(:disabled),
+.b-menu-item[data-highlight="true"]:not(:disabled) {
+  box-shadow:
+    inset var(--hairline) var(--hairline) 0 0 var(--panel-lighten-max),
+    inset calc(-1 * var(--hairline)) calc(-1 * var(--hairline)) 0 0 var(--panel-darken-3);
+}
+.b-menu-item:disabled { color: var(--panel-darken-2); }
+.b-menu-item-shortcut { margin-left: auto; color: var(--panel-darken-3); padding-left: 20px; }
+.b-menu-item-mark { width: 10px; flex: none; }
+.b-menu-separator {
+  height: calc(2 * var(--hairline));
+  margin: 3px 2px;
+  background: linear-gradient(var(--panel-darken-2) 50%, var(--panel-lighten-max) 50%);
+}
+
+/* --------------------------------------------------------- BScrollBar
+   Native scrollbars styled to R5: beveled trough, dotted knob, arrow ends.
+   WebKit/Blink gets the full treatment; Gecko falls back to scrollbar-color. */
+.b-scroll {
+  overflow: auto;
+  scrollbar-color: var(--panel) var(--panel-darken-1);
+  scrollbar-width: auto;
+  /* Isolate scroll repaints from the rest of the window. */
+  contain: paint;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+.b-scroll::-webkit-scrollbar {
+  width: var(--scrollbar-size);
+  height: var(--scrollbar-size);
+  background: var(--panel-darken-1);
+}
+.b-scroll::-webkit-scrollbar-track {
+  background: var(--panel-darken-1);
+  box-shadow:
+    inset var(--hairline) var(--hairline) 0 0 var(--panel-darken-3),
+    inset calc(-1 * var(--hairline)) calc(-1 * var(--hairline)) 0 0 var(--panel-lighten-max);
+}
+.b-scroll::-webkit-scrollbar-thumb {
+  background-color: var(--panel);
+  /* R5's stippled knob texture: a fine diagonal shine hatch. */
+  background-image:
+    repeating-linear-gradient(45deg,
+      var(--panel-lighten-max) 0 1px, transparent 1px 3px);
+  box-shadow:
+    inset var(--hairline) var(--hairline) 0 0 var(--panel-lighten-max),
+    inset calc(-1 * var(--hairline)) calc(-1 * var(--hairline)) 0 0 var(--panel-darken-3),
+    inset calc(2 * var(--hairline)) calc(2 * var(--hairline)) 0 0 var(--panel-lighten-1),
+    inset calc(-2 * var(--hairline)) calc(-2 * var(--hairline)) 0 0 var(--panel-darken-2);
+}
+.b-scroll::-webkit-scrollbar-corner { background: var(--panel); }
+.b-scroll::-webkit-scrollbar-button:single-button {
+  background-color: var(--panel);
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: 8px 8px;
+  box-shadow:
+    inset var(--hairline) var(--hairline) 0 0 var(--panel-lighten-max),
+    inset calc(-1 * var(--hairline)) calc(-1 * var(--hairline)) 0 0 var(--panel-darken-3),
+    inset calc(2 * var(--hairline)) calc(2 * var(--hairline)) 0 0 var(--panel-lighten-1),
+    inset calc(-2 * var(--hairline)) calc(-2 * var(--hairline)) 0 0 var(--panel-darken-2);
+}
+.b-scroll::-webkit-scrollbar-button:single-button:vertical:decrement {
+  height: var(--scrollbar-size);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 8'%3E%3Cpath d='M4 2L7 6H1z' fill='%23000'/%3E%3C/svg%3E");
+}
+.b-scroll::-webkit-scrollbar-button:single-button:vertical:increment {
+  height: var(--scrollbar-size);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 8'%3E%3Cpath d='M4 6L1 2h6z' fill='%23000'/%3E%3C/svg%3E");
+}
+.b-scroll::-webkit-scrollbar-button:single-button:horizontal:decrement {
+  width: var(--scrollbar-size);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 8'%3E%3Cpath d='M2 4L6 1v6z' fill='%23000'/%3E%3C/svg%3E");
+}
+.b-scroll::-webkit-scrollbar-button:single-button:horizontal:increment {
+  width: var(--scrollbar-size);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 8'%3E%3Cpath d='M6 4L2 7V1z' fill='%23000'/%3E%3C/svg%3E");
+}
+
+/* ------------------------------------------------------------ BListView */
+.b-list {
+  background: var(--list-bg);
+  color: #000;
+}
+.b-list-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 18px;
+  padding: 0 6px;
+  cursor: default;
+  white-space: nowrap;
+}
+.b-list-item[data-selected="true"] {
+  background: var(--list-selected);
+  color: var(--list-selected-text);
+}
+
+/* --------------------------------------------------------- BStatusBar */
+.b-statusbar {
+  height: 16px;
+  background: var(--document);
+  box-shadow:
+    inset var(--hairline) var(--hairline) 0 0 var(--panel-darken-3),
+    inset calc(-1 * var(--hairline)) calc(-1 * var(--hairline)) 0 0 var(--panel-lighten-max);
+  overflow: hidden;
+}
+.b-statusbar-fill {
+  height: 100%;
+  background: var(--tab-active);
+  box-shadow:
+    inset var(--hairline) var(--hairline) 0 0 var(--tab-active-lite),
+    inset calc(-1 * var(--hairline)) calc(-1 * var(--hairline)) 0 0 var(--tab-active-dark);
+  transition: width 120ms linear;
+}
+
+/* --------------------------------------------------------------- BBox */
+.b-box {
+  position: relative;
+  padding: 12px 10px 10px;
+  margin-top: 6px;
+  box-shadow:
+    inset var(--hairline) var(--hairline) 0 0 var(--panel-darken-3),
+    inset calc(-1 * var(--hairline)) calc(-1 * var(--hairline)) 0 0 var(--panel-lighten-max);
+}
+.b-box-label {
+  position: absolute;
+  top: -8px; left: 8px;
+  padding: 0 4px;
+  background: var(--panel);
+  font-size: var(--fs-plain);
+}
+
+/* -------------------------------------------------------------- utility */
+.b-panel { background: var(--panel); }
+.b-hgroup { display: flex; align-items: center; gap: 8px; }
+.b-vgroup { display: flex; flex-direction: column; gap: 8px; }
+.b-spacer { flex: 1 1 auto; }
+.b-fixed { font-family: var(--font-fixed); }
