@@ -1,0 +1,131 @@
+.claude {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  background: var(--panel);
+}
+
+.claude-transcript {
+  flex: 1 1 auto;
+  min-height: 0;
+  margin: 4px;
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: var(--document);
+  box-shadow:
+    inset var(--hairline) var(--hairline) 0 0 var(--panel-darken-3),
+    inset calc(-1 * var(--hairline)) calc(-1 * var(--hairline)) 0 0 var(--panel-lighten-max),
+    inset calc(2 * var(--hairline)) calc(2 * var(--hairline)) 0 0 var(--panel-darken-2),
+    inset calc(-2 * var(--hairline)) calc(-2 * var(--hairline)) 0 0 var(--panel-lighten-1);
+}
+
+.claude-empty {
+  margin: auto;
+  padding: 0 12px;
+  text-align: center;
+  color: var(--panel-darken-3);
+  font-style: italic;
+}
+
+/* Turns are beveled panels rather than rounded bubbles -- R5 had no rounded
+   chrome, and the yellow tab is the only accent colour in the system. */
+.claude-turn {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 5px 7px;
+  max-width: 92%;
+}
+.claude-turn[data-role='user'] {
+  align-self: flex-end;
+  background: var(--list-selected);
+  box-shadow:
+    inset var(--hairline) var(--hairline) 0 0 var(--panel-lighten-max),
+    inset calc(-1 * var(--hairline)) calc(-1 * var(--hairline)) 0 0 var(--panel-darken-3);
+}
+.claude-turn[data-role='assistant'] {
+  align-self: flex-start;
+  background: var(--panel);
+  box-shadow:
+    inset var(--hairline) var(--hairline) 0 0 var(--panel-lighten-max),
+    inset calc(-1 * var(--hairline)) calc(-1 * var(--hairline)) 0 0 var(--panel-darken-3);
+}
+
+.claude-who {
+  font-size: var(--fs-small);
+  font-weight: 700;
+  color: var(--panel-darken-4);
+}
+.claude-text {
+  margin: 0;
+  font-size: var(--fs-plain);
+  line-height: 16px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* Blinking block caret while a reply streams. */
+.claude-caret {
+  display: inline-block;
+  width: 6px;
+  height: 12px;
+  margin-left: 2px;
+  vertical-align: text-bottom;
+  background: var(--panel-darken-4);
+  animation: claude-blink 1s steps(2, start) infinite;
+}
+@keyframes claude-blink {
+  to { visibility: hidden; }
+}
+
+.claude-composer {
+  flex: none;
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+  padding: 0 4px 4px;
+}
+.claude-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  resize: none;
+  padding: 5px 6px;
+  border: none;
+  outline: none;
+  background: var(--document);
+  color: var(--document-text);
+  font-family: var(--font-plain);
+  font-size: var(--fs-plain);
+  line-height: 15px;
+  box-shadow:
+    inset var(--hairline) var(--hairline) 0 0 var(--panel-darken-3),
+    inset calc(-1 * var(--hairline)) calc(-1 * var(--hairline)) 0 0 var(--panel-lighten-max),
+    inset calc(2 * var(--hairline)) calc(2 * var(--hairline)) 0 0 var(--panel-darken-2),
+    inset calc(-2 * var(--hairline)) calc(-2 * var(--hairline)) 0 0 var(--panel-lighten-1);
+}
+.claude-input:focus {
+  outline: calc(2 * var(--hairline)) solid var(--navigation);
+  outline-offset: -1px;
+}
+.claude-input:disabled { color: var(--panel-darken-3); }
+
+.claude-status {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 17px;
+  padding: 0 6px;
+  font-size: var(--fs-small);
+  color: var(--panel-darken-4);
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+@media (pointer: coarse) {
+  .claude-turn { max-width: 96%; }
+  .claude-input { font-size: 13px; line-height: 18px; }
+}

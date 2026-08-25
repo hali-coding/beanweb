@@ -352,3 +352,45 @@
 @media (pointer: coarse) {
   .savepanel-row { height: 30px; }
 }
+
+/* ------------------------------------------------------------ key panel */
+.keypanel {
+  width: min(400px, 100%);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  background: var(--panel);
+  box-shadow:
+    inset var(--hairline) var(--hairline) 0 0 var(--panel-lighten-max),
+    inset calc(-1 * var(--hairline)) calc(-1 * var(--hairline)) 0 0 var(--panel-darken-3),
+    4px 4px 0 0 rgba(0, 0, 0, 0.3);
+}
+.keypanel-title {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+}
+.keypanel-note {
+  margin: 0;
+  font-size: var(--fs-small);
+  line-height: 14px;
+  color: var(--panel-darken-4);
+}
+.keypanel-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: var(--fs-plain);
+}
+.keypanel-current {
+  margin: 0;
+  font-family: var(--font-fixed);
+  font-size: var(--fs-small);
+  color: var(--panel-darken-4);
+}
+.keypanel-buttons {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}

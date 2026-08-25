@@ -74,8 +74,9 @@ Things worth trying:
   * Open a Terminal and run 'help'.
   * Everything you save here survives a reload; it lives in localStorage.
 
-Nothing here talks to a server. The filesystem, the shell and the clock
-all run in your tab.
+The filesystem, the shell and the clock all run in your tab -- there is
+no backend. The one exception is the Claude app, which calls the Anthropic
+API using a key you supply. That key is stored in this browser only.
 `
 
 const HAIKU = `The Web site you seek
@@ -124,6 +125,7 @@ function seed(): Record<string, FsNode> {
     app('/boot/apps/Terminal', 'terminal'),
     app('/boot/apps/StyledEdit', 'styledit'),
     app('/boot/apps/Tetris', 'tetris'),
+    app('/boot/apps/Claude', 'claude'),
   ]
   return Object.fromEntries(nodes.map((n) => [n.path, n]))
 }

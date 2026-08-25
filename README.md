@@ -34,10 +34,23 @@ npm test         # vitest + jsdom
 - **Tetris** — 7-bag randomiser, wall kicks, a landing shadow you can switch
   off, and the classic tetromino palette muted a shade to sit against R5 grey.
   Touch pad on phones.
+- **Claude** — a bare-bones chat client: streaming replies, stop mid-answer,
+  multi-turn history. Needs your own Anthropic API key (see below).
 - **Deskbar** — application menu, live clock, and one entry per open window.
 
 Files you create or edit persist in `localStorage`. *About BeanWeb → Reset disk*
 restores the original contents.
+
+### About the Claude app and your API key
+
+Everything else here is backend-free, and the Claude app keeps it that way by
+calling the Anthropic API straight from the browser. That means **your API key
+is stored in this browser** (`localStorage`) and is readable by anything running
+on the page. The Anthropic SDK requires you to opt into this explicitly, and it
+is only appropriate for a local tool you run yourself.
+
+Use a key you are willing to rotate, and **never deploy a build with a key set**.
+No key ships with this repo, and none is ever written to the virtual disk.
 
 ## Keyboard
 

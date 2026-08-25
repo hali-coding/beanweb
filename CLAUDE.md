@@ -52,7 +52,8 @@ src/
   main.tsx    entry: CSS in cascade order, then `import './apps'`, then render
   styles/     tokens.css (R5 palette) + reset, widgets, wm, shell
   lib/        types.ts, icons.tsx (original 32-unit-grid SVGs)
-  store/      desktop.ts (windows, focus, alerts), fs.ts (virtual FS)
+  store/      desktop.ts (windows, focus, modals), fs.ts (virtual FS),
+              settings.ts (API key)
   wm/         BWindow, WindowLayer, useWindowGesture, useViewport
   widgets/    controls.tsx (Button, CheckBox, …), Menu.tsx (MenuBar + MenuPanel)
   apps/       registry.ts + one file per app + index.ts
@@ -145,6 +146,29 @@ the Deskbar becomes a bottom dock with a safe-area inset. `@media (pointer:
 coarse)` separately grows hit targets — scrollbars, tab height, list rows —
 without changing the desktop metrics. Touch works because everything is Pointer
 Events, not mouse events.
+
+## The Claude app and its API key
+
+`apps/Claude.tsx` is the only thing here that touches the network. It calls the
+Anthropic API **directly from the browser** with `dangerouslyAllowBrowser: true`,
+because the project has no backend to proxy through.
+
+- The key lives in `store/settings.ts` under `beanweb.settings.v1` and is
+  **entered by the user**. Never hard-code one, never commit one, never write one
+  into the virtual filesystem, and never log it.
+- Render it only through `maskKey()`. It must not appear in full anywhere.
+- The security tradeoff is real: any script on the page can read it. That is
+  acceptable for a local desktop toy — the Anthropic docs sanction exactly this
+  "internal tool / development" case — and **not** acceptable for a public
+  deploy. If this is ever hosted, the app needs a server-side proxy first.
+- Use `claude-opus-5`, stream (`client.messages.stream`), and resend the **full**
+  `Anthropic.MessageParam[]` history every turn — the API is stateless. Do not
+  use assistant prefill; it returns 400 on Opus 5.
+- Stream deltas are buffered in a ref and flushed on `requestAnimationFrame`,
+  the same rule as window drag: never one render per token.
+- Tests must mock `@anthropic-ai/sdk`. No test may make a network call. Copy the
+  real error classes onto the mock so `instanceof` branches still work — see
+  `tests/claude.test.tsx`.
 
 ## Conventions
 

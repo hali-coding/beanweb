@@ -5,6 +5,7 @@ import { Deskbar } from './Deskbar'
 import { DesktopIcons } from './DesktopIcons'
 import { Alerts } from './Alerts'
 import { SavePanel } from './SavePanel'
+import { KeyPanel } from './KeyPanel'
 import { useShortcuts } from './useShortcuts'
 
 export function Desktop() {
@@ -28,6 +29,7 @@ export function Desktop() {
       </div>
       <Deskbar />
       <SavePanel />
+      <KeyPanel />
       <Alerts />
     </div>
   )

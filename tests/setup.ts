@@ -2,6 +2,8 @@ import { afterEach, beforeEach } from 'vitest'
 import { cleanup } from '@testing-library/react'
 import { useDesktop } from '@/store/desktop'
 import { useFs } from '@/store/fs'
+import { useSettings } from '@/store/settings'
+import { DEFAULT_MODEL } from '@/lib/models'
 
 /**
  * Both Zustand stores are module singletons, so state written by one test would
@@ -25,8 +27,16 @@ if (!window.matchMedia) {
 
 beforeEach(() => {
   localStorage.clear()
-  useDesktop.setState({ windows: {}, order: [], activeId: null, alerts: [], savePanels: [] })
+  useDesktop.setState({
+    windows: {},
+    order: [],
+    activeId: null,
+    alerts: [],
+    savePanels: [],
+    keyPrompts: [],
+  })
   useFs.getState().reset()
+  useSettings.setState({ apiKey: '', model: DEFAULT_MODEL })
 })
 
 afterEach(() => {
