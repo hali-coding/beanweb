@@ -35,13 +35,17 @@ npm test         # vitest + jsdom
   off, and the classic tetromino palette muted a shade to sit against R5 grey.
   Touch pad on phones.
 - **Claude** — a bare-bones chat client: streaming replies, stop mid-answer,
-  multi-turn history. Needs your own Anthropic API key (see below).
+  multi-turn history, and a **Model** menu listing what your key can actually
+  reach, priced and sorted cheapest first. Defaults to the cheapest model.
+  Needs your own Anthropic API key (see below).
 - **Deskbar** — application menu, live clock, and one entry per open window.
 
 Files you create or edit persist in `localStorage`. *About BeanWeb → Reset disk*
 restores the original contents.
 
 ### About the Claude app and your API key
+
+![The Claude app answering a question about BeOS, running on claude-haiku-4-5 with token usage in the status bar, Tracker open on /boot/home behind it](docs/screenshot_claude.png)
 
 Everything else here is backend-free, and the Claude app keeps it that way by
 calling the Anthropic API straight from the browser. That means **your API key
@@ -51,6 +55,11 @@ is only appropriate for a local tool you run yourself.
 
 Use a key you are willing to rotate, and **never deploy a build with a key set**.
 No key ships with this repo, and none is ever written to the virtual disk.
+
+The **Model** menu polls the Models API for what your key can reach and shows
+each model's price. Pricing comes from a table in `src/lib/models.ts` rather
+than the API, which does not report it — so it is a cached snapshot and may
+drift. Models it has no price for still work; they just sort last.
 
 ## Keyboard
 

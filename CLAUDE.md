@@ -161,9 +161,22 @@ because the project has no backend to proxy through.
   acceptable for a local desktop toy — the Anthropic docs sanction exactly this
   "internal tool / development" case — and **not** acceptable for a public
   deploy. If this is ever hosted, the app needs a server-side proxy first.
-- Use `claude-opus-5`, stream (`client.messages.stream`), and resend the **full**
+- Stream (`client.messages.stream`) and resend the **full**
   `Anthropic.MessageParam[]` history every turn — the API is stateless. Do not
-  use assistant prefill; it returns 400 on Opus 5.
+  use assistant prefill; it returns 400 on the 4.6+ family.
+- **The model is the user's choice, not a constant.** `lib/models.ts` holds the
+  catalogue; `store/settings.ts` persists the selection. The default is
+  `DEFAULT_MODEL` — the cheapest model we hold a price for — because the user
+  asked for that, not because cheap is the right default in general.
+- **Never hard-code request shape per model.** `requestShape()` derives
+  `max_tokens` from the model's reported cap and only sends
+  `thinking: {type:'adaptive'}` when `capabilities.thinking.types.adaptive`
+  says so. Haiku 4.5 predates adaptive thinking and 400s if it is sent.
+- Prices are **not** in the Models API. `PRICES` in `lib/models.ts` is a cached
+  table and will drift; unpriced models still work, they just sort last.
+- `pollModels` keeps its in-flight guard in a **ref**, not state. Depending on a
+  flag the callback also sets would re-fire the effect that calls it — the same
+  infinite-loop shape as the `useShallow` rule above.
 - Stream deltas are buffered in a ref and flushed on `requestAnimationFrame`,
   the same rule as window drag: never one render per token.
 - Tests must mock `@anthropic-ai/sdk`. No test may make a network call. Copy the

@@ -358,6 +358,16 @@ describe('Claude chat', () => {
       expect(priced[1]).toContain('Claude Opus 5')
     })
 
+    it('polls once per key, not in a loop', async () => {
+      useSettings.setState({ apiKey: 'sk-ant-test' })
+      listFn.mockReturnValue(modelPage([modelInfo('claude-haiku-4-5')]))
+      mount()
+      await waitFor(() => expect(listFn).toHaveBeenCalled())
+      // Setting state the poll itself owns must not re-trigger the effect.
+      await new Promise((r) => setTimeout(r, 120))
+      expect(listFn).toHaveBeenCalledTimes(1)
+    })
+
     it('keeps the fallback list when the poll fails', async () => {
       useSettings.setState({ apiKey: 'sk-ant-test' })
       listFn.mockImplementation(() => {

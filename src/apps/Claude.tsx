@@ -62,6 +62,10 @@ export function Claude({ windowId }: AppProps) {
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const historyRef = useRef<History>([])
   const controllerRef = useRef<AbortController | null>(null)
+  /** In-flight guard. A ref, not the state below, so pollModels keeps a stable
+      identity -- depending on a flag it also sets would re-fire the effect that
+      calls it, in a loop. The state is only for the menu label. */
+  const pollingRef = useRef(false)
 
   /* --- streaming buffer -------------------------------------------------
      Text deltas arrive far faster than 60fps. Accumulate them in a ref and
@@ -168,7 +172,8 @@ export function Claude({ windowId }: AppProps) {
    */
   const pollModels = useCallback(
     async (key: string, announce = false) => {
-      if (!key || polling) return
+      if (!key || pollingRef.current) return
+      pollingRef.current = true
       setPolling(true)
       try {
         const client = new Anthropic({ apiKey: key, dangerouslyAllowBrowser: true })
@@ -184,19 +189,17 @@ export function Claude({ windowId }: AppProps) {
       } catch (err) {
         if (announce) await reportError(err)
       } finally {
+        pollingRef.current = false
         setPolling(false)
       }
     },
-    [polling, reportError, showAlert],
+    [reportError, showAlert],
   )
 
   // Refresh the catalogue whenever a key becomes available.
   useEffect(() => {
     if (apiKey) void pollModels(apiKey)
-    // pollModels is intentionally omitted: it changes on every poll toggle and
-    // would re-fire this effect in a loop.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [apiKey])
+  }, [apiKey, pollModels])
 
   const send = useCallback(async () => {
     const text = draft.trim()
