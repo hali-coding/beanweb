@@ -6,6 +6,10 @@ window manager, the filesystem and the shell all run client-side.
 
 Built with React 19, TypeScript, Vite and Zustand. ~73 KB of gzipped JS.
 
+![Tracker browsing /boot/home beside a game of Tetris, with the Deskbar top-right](docs/screenshot1.png)
+
+![StyledEdit over an unsaved beanweb.txt, the Terminal listing ~/documents, and the About BeanWeb window](docs/screenshot2.png)
+
 ## Quick start
 
 ```bash
