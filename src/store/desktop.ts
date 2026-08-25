@@ -5,6 +5,7 @@ import type {
   AlertState,
   BWindowState,
   Rect,
+  KeyPromptState,
   SavePanelState,
   WindowId,
 } from '@/lib/types'
@@ -41,6 +42,7 @@ interface DesktopStore {
   activeId: WindowId | null
   alerts: AlertState[]
   savePanels: SavePanelState[]
+  keyPrompts: KeyPromptState[]
 
   openWindow: (opts: OpenOptions) => WindowId
   /** Ask the window's close guard first; use this for anything user-initiated. */
@@ -65,6 +67,10 @@ interface DesktopStore {
   /** Open a save panel; resolves with the chosen path, or null on cancel. */
   showSavePanel: (title: string, directory: string, name: string) => Promise<string | null>
   dismissSavePanel: (id: string, path: string | null) => void
+
+  /** Ask for an API key; resolves with the key, or null on cancel. */
+  showKeyPrompt: (current: string) => Promise<string | null>
+  dismissKeyPrompt: (id: string, key: string | null) => void
 }
 
 /** Cascade new windows so they never land exactly on top of each other. */
@@ -81,6 +87,7 @@ export const useDesktop = create<DesktopStore>((set, get) => ({
   activeId: null,
   alerts: [],
   savePanels: [],
+  keyPrompts: [],
 
   openWindow: (opts) => {
     if (opts.singleton) {
@@ -243,6 +250,18 @@ export const useDesktop = create<DesktopStore>((set, get) => ({
     set((s) => ({ savePanels: s.savePanels.filter((p) => p.id !== id) }))
     panel?.resolve(path)
   },
+
+  showKeyPrompt: (current) =>
+    new Promise<string | null>((resolve) => {
+      const id = uid('key')
+      set((s) => ({ keyPrompts: [...s.keyPrompts, { id, current, resolve }] }))
+    }),
+
+  dismissKeyPrompt: (id, key) => {
+    const prompt = get().keyPrompts.find((p) => p.id === id)
+    set((s) => ({ keyPrompts: s.keyPrompts.filter((p) => p.id !== id) }))
+    prompt?.resolve(key)
+  },
 }))
 
 /* ---------------------------------------------------------------- selectors
@@ -254,6 +273,7 @@ export const selectOrder = (s: DesktopStore) => s.order
 export const selectActiveId = (s: DesktopStore) => s.activeId
 export const selectAlerts = (s: DesktopStore) => s.alerts
 export const selectSavePanels = (s: DesktopStore) => s.savePanels
+export const selectKeyPrompts = (s: DesktopStore) => s.keyPrompts
 
 /** Imperative handles for code outside React (menus, app internals). */
 export const desktop = {

@@ -169,3 +169,15 @@ export function TetrisIcon({ size = 32, className }: IconProps) {
     </svg>
   )
 }
+
+/** Anthropic-flavoured burst mark, drawn fresh on the 32-unit grid. */
+export function ClaudeIcon({ size = 32, className }: IconProps) {
+  return (
+    <svg {...box(size)} className={className}>
+      <rect x="3" y="4" width="26" height="24" rx="2" fill="#d97757" stroke="#7a3a24" strokeWidth="1.5" />
+      <g stroke="#fdf6f2" strokeWidth="2.4" strokeLinecap="round">
+        <path d="M16 9v14M10 12l12 8M22 12l-12 8" />
+      </g>
+    </svg>
+  )
+}

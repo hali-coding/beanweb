@@ -48,3 +48,11 @@ export interface SavePanelState {
   /** Resolves with the chosen path, or null if the user cancelled. */
   resolve: (path: string | null) => void
 }
+
+export interface KeyPromptState {
+  id: string
+  /** Current key, so the panel can show it is already set. */
+  current: string
+  /** Resolves with the new key, or null if the user cancelled. */
+  resolve: (key: string | null) => void
+}

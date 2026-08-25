@@ -93,11 +93,17 @@ interface ScrollViewProps extends React.HTMLAttributes<HTMLDivElement> {
   children: ReactNode
 }
 
-/** A scrollable region wearing R5 scrollbars. */
-export function ScrollView({ children, className, ...rest }: ScrollViewProps) {
+/**
+ * A scrollable region wearing R5 scrollbars. Forwards a ref so callers can
+ * drive scrollTop (chat transcripts, terminal output).
+ */
+export const ScrollView = forwardRef<HTMLDivElement, ScrollViewProps>(function ScrollView(
+  { children, className, ...rest },
+  ref,
+) {
   return (
-    <div className={['b-scroll', className].filter(Boolean).join(' ')} {...rest}>
+    <div ref={ref} className={['b-scroll', className].filter(Boolean).join(' ')} {...rest}>
       {children}
     </div>
   )
-}
+})
