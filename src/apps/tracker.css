@@ -57,7 +57,7 @@
 .tracker-empty {
   margin: 0;
   padding: 14px;
-  color: var(--panel-darken-3);
+  color: var(--panel-text-faint);
   font-style: italic;
 }
 
@@ -71,7 +71,7 @@
   background: none;
   border: none;
   cursor: default;
-  color: #000;
+  color: var(--document-text);
 }
 .tracker-icon-label {
   max-width: 100%;
@@ -128,7 +128,7 @@
   align-items: center;
   padding: 0 6px;
   font-size: var(--fs-small);
-  color: #000;
+  color: var(--panel-text);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

@@ -36,7 +36,7 @@
   touch-action: none;
   background: none;
   border: none;
-  color: #fff;
+  color: var(--desktop-text);
 }
 .b-desktop-icon-glyph {
   width: 32px;
@@ -58,7 +58,7 @@
 }
 .b-desktop-icon[data-selected="true"] .b-desktop-icon-label {
   background: var(--list-selected);
-  color: #000;
+  color: var(--list-selected-text);
   text-shadow: none;
 }
 .b-desktop-icon[data-selected="true"] .b-desktop-icon-glyph {
@@ -81,7 +81,7 @@
   box-shadow:
     inset var(--hairline) var(--hairline) 0 0 var(--panel-lighten-max),
     inset calc(-1 * var(--hairline)) calc(-1 * var(--hairline)) 0 0 var(--panel-darken-3),
-    -2px 2px 0 0 rgba(0, 0, 0, 0.25);
+    -2px 2px 0 0 var(--shadow-cast);
 }
 
 .b-deskbar-logo {
@@ -94,7 +94,7 @@
   background: var(--tab-active);
   border: none;
   cursor: default;
-  color: #000;
+  color: var(--tab-text);
   box-shadow:
     inset var(--hairline) var(--hairline) 0 0 var(--tab-active-lite),
     inset calc(-1 * var(--hairline)) calc(-1 * var(--hairline)) 0 0 var(--tab-active-dark);
@@ -128,7 +128,7 @@
 .b-deskbar-date {
   font-size: var(--fs-small);
   line-height: 12px;
-  color: var(--panel-darken-3);
+  color: var(--panel-text-faint);
 }
 
 .b-deskbar-apps {
@@ -149,7 +149,7 @@
   background: transparent;
   cursor: default;
   text-align: left;
-  color: #000;
+  color: var(--panel-text);
   overflow: hidden;
 }
 .b-deskbar-app[data-active="true"] {
@@ -181,7 +181,7 @@
     padding-bottom: env(safe-area-inset-bottom, 0px);
     box-shadow:
       inset 0 var(--hairline) 0 0 var(--panel-lighten-max),
-      0 -2px 0 0 rgba(0, 0, 0, 0.25);
+      0 -2px 0 0 var(--shadow-cast);
   }
   .b-deskbar-logo { height: auto; width: 54px; justify-content: center; }
   .b-deskbar-tray {
@@ -212,7 +212,7 @@
   z-index: var(--z-alert);
   display: grid;
   place-items: center;
-  background: rgba(0, 0, 0, 0.18);
+  background: var(--scrim);
   padding: 16px;
 }
 .b-alert {
@@ -221,7 +221,7 @@
   box-shadow:
     inset var(--hairline) var(--hairline) 0 0 var(--panel-lighten-max),
     inset calc(-1 * var(--hairline)) calc(-1 * var(--hairline)) 0 0 var(--panel-darken-3),
-    4px 4px 0 0 rgba(0, 0, 0, 0.3);
+    4px 4px 0 0 var(--shadow-cast);
   display: flex;
   flex-direction: column;
 }
@@ -239,11 +239,11 @@
 .b-boot {
   position: fixed;
   inset: 0;
-  z-index: 10000;
+  z-index: var(--z-boot);
   display: grid;
   place-items: center;
   background: var(--desktop);
-  color: #fff;
+  color: var(--desktop-text);
   gap: 12px;
   animation: b-boot-out 400ms ease 900ms forwards;
 }
@@ -263,7 +263,7 @@
   box-shadow:
     inset var(--hairline) var(--hairline) 0 0 var(--panel-lighten-max),
     inset calc(-1 * var(--hairline)) calc(-1 * var(--hairline)) 0 0 var(--panel-darken-3),
-    4px 4px 0 0 rgba(0, 0, 0, 0.3);
+    4px 4px 0 0 var(--shadow-cast);
 }
 
 .savepanel-nav {
@@ -309,7 +309,7 @@
 .savepanel-empty {
   margin: 0;
   padding: 10px;
-  color: var(--panel-darken-3);
+  color: var(--panel-text-faint);
   font-style: italic;
 }
 .savepanel-row {
@@ -323,10 +323,10 @@
   background: transparent;
   text-align: left;
   cursor: default;
-  color: #000;
+  color: var(--document-text);
 }
 .savepanel-row:hover { background: var(--panel-lighten-2); }
-.savepanel-row[data-dim='true'] { color: var(--panel-darken-3); }
+.savepanel-row[data-dim='true'] { color: var(--panel-text-faint); }
 .savepanel-row[data-selected='true'],
 .savepanel-row[data-selected='true']:hover {
   background: var(--list-selected);
@@ -369,7 +369,7 @@
   box-shadow:
     inset var(--hairline) var(--hairline) 0 0 var(--panel-lighten-max),
     inset calc(-1 * var(--hairline)) calc(-1 * var(--hairline)) 0 0 var(--panel-darken-3),
-    4px 4px 0 0 rgba(0, 0, 0, 0.3);
+    4px 4px 0 0 var(--shadow-cast);
 }
 .keypanel-title {
   margin: 0;
@@ -380,7 +380,7 @@
   margin: 0;
   font-size: var(--fs-small);
   line-height: 14px;
-  color: var(--panel-darken-4);
+  color: var(--panel-text-dim);
 }
 .keypanel-field {
   display: flex;
@@ -392,7 +392,7 @@
   margin: 0;
   font-family: var(--font-fixed);
   font-size: var(--fs-small);
-  color: var(--panel-darken-4);
+  color: var(--panel-text-dim);
 }
 .keypanel-buttons {
   display: flex;
@@ -459,4 +459,30 @@
 
 @media (max-width: 767px) {
   .b-shutdown { padding-bottom: 16px; }
+}
+
+/* ------------------------------------------------------- theme curtain
+   Dropped over the desktop while the palette changes underneath, so the swap
+   is never seen half-done. Painted the colour of the desktop that is arriving,
+   which is why both backdrops are theme-invariant tokens. Transform only, so
+   the sweep is compositor work -- same rule as a window drag. */
+.b-curtain {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-curtain);
+  will-change: transform;
+}
+.b-curtain[data-to="light"] { background: var(--desktop-light); }
+.b-curtain[data-to="dark"]  { background: var(--desktop-dark); }
+
+.b-curtain--dropping { animation: b-curtain-drop 260ms cubic-bezier(0.4, 0, 0.2, 1) forwards; }
+.b-curtain--lifting  { animation: b-curtain-lift 260ms cubic-bezier(0.4, 0, 0.2, 1) forwards; }
+
+@keyframes b-curtain-drop {
+  from { transform: translateY(-100%); }
+  to   { transform: translateY(0); }
+}
+@keyframes b-curtain-lift {
+  from { transform: translateY(0); }
+  to   { transform: translateY(-100%); }
 }

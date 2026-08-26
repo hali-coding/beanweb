@@ -11,7 +11,7 @@ npm run dev        # Vite dev server with HMR
 npm run build      # tsc -b && vite build  -> dist/
 npm run preview    # serve the production build
 npm run typecheck  # types only
-npm test           # vitest run  (306 tests)
+npm test           # vitest run  (325 tests)
 npm run test:watch # vitest, watch mode
 ```
 
@@ -57,14 +57,15 @@ Both have already been wrong while the suite was green — drive the browser.
 src/
   main.tsx    entry: CSS in cascade order, then `import './apps'`, then render
   styles/     tokens.css (R5 palette) + reset, widgets, wm, shell
-  lib/        types.ts, icons.tsx (original 32-unit-grid SVGs)
+  lib/        types.ts, icons.tsx (original 32-unit-grid SVGs), theme.ts,
+              disk.ts (the shared reset-disk confirmation)
   store/      desktop.ts (windows, focus, modals), fs.ts (virtual FS),
-              settings.ts (API key)
+              settings.ts (API key, model, theme)
   wm/         BWindow, WindowLayer, useWindowGesture, useViewport
   widgets/    controls.tsx (Button, CheckBox, …), Menu.tsx (MenuBar + MenuPanel)
   apps/       registry.ts + one file per app + index.ts
   shell/      Desktop, Deskbar, DesktopIcons, Alerts, SavePanel, Shutdown,
-              useShortcuts
+              ThemeCurtain, useShortcuts
 tests/        vitest + jsdom; setup.ts resets the stores between tests
 ```
 
@@ -242,12 +243,86 @@ from `1px` to `0.5px`/`0.34px` as `min-resolution` rises so widgets stay exactly
 one *device* pixel crisp instead of getting fat and soft on retina. Reach for
 `.bevel-raised` / `.bevel-sunken` before writing new shadow stacks.
 
-Fixed values worth knowing: tab yellow `#ffc900` (`B_WINDOW_TAB_COLOR`),
-keyboard focus `#0000e5`, desktop `#336698`, plain font 12px/15px.
+Fixed values worth knowing (light): tab yellow `#ffc900`
+(`B_WINDOW_TAB_COLOR`), keyboard focus `#0000e5`, desktop `#336698`, plain font
+12px/15px.
 
 CSS class names are prefixed `b-` and named after the BeOS class they imitate
 (`b-menubar`, `b-statusbar`, `b-textcontrol`). Per-app CSS sits next to the app
 in a lowercase file (`tracker.css`) and uses the app's own prefix.
+
+### Dark mode
+
+`tokens.css` holds two palettes, switched by `data-theme` on the **root
+element**. Everything above them — metrics, the `--z-*` ladder, and
+`--desktop-light`/`--desktop-dark` — is theme-invariant.
+
+- **The attribute goes on `documentElement`, never on `.b-desktop`.** Menus
+  render through a portal into `document.body`, so an attribute set on the
+  desktop div would leave every open menu on the old palette. `lib/theme.ts` is
+  the only thing that writes it, and it also updates the `theme-color` meta.
+- **Dark is `tint_color()` from a base of 110 for the darken arm only.** The
+  lighten arm is anchored to white, so from 110 it returns `#ffffff` for
+  `--panel-lighten-max` — a 145-step jump where light mode takes 39, and a
+  pure-white hairline on mid-grey reads as glare, not as a bevel. The dark
+  lighten values mirror light mode's *proportional* steps upward instead. Both
+  deviations are commented at the point of use.
+- **The panel ramp means *bevel*. Text has its own tokens.** `--panel-text`,
+  `-dim`, `-faint`, `-disabled` and `--mark`. The ramp used to double as a text
+  ramp, which inverts in dark mode: disabled text has to come out *lighter* than
+  the panel, not darker. Never write `color: var(--panel-darken-*)` again, and
+  never a bare `#000`/`#fff`. Both light ladders are the exact values those
+  sites rendered before, so the swap changed nothing in light mode.
+- **Dark cannot reach light's contrast range**, and should not try. A `#6e6e6e`
+  panel gives primary text a ratio of 4.6 against light mode's 14.7. The three
+  levels are chosen so each one's *ratio* matches its light counterpart; check
+  with a contrast calculation rather than by eye before adding a fourth.
+- **Terminal, the BASIC console, the BASIC screen and Tetris are deliberately
+  not themed.** They are screens and a game, not chrome — emulated CGA/VGA
+  attributes, a phosphor palette, tetromino colours. So is `lib/icons.tsx`: R5
+  icons were full-colour artwork, and a page icon is white paper on any desktop.
+- **The four scrollbar arrows are `data:` URIs.** `var()` cannot be interpolated
+  inside `url()`, so the dark theme re-declares those four `background-image`
+  rules. Note that a Chrome using overlay scrollbars ignores
+  `::-webkit-scrollbar` entirely, so the arrows may not render at all — that is
+  the environment, not the rule.
+- **`index.html` stamps the root before the first paint.** A small inline script
+  reads `beanweb.settings.v1` so a persisted dark theme does not flash light
+  while React boots. It is the only place the storage key is duplicated.
+- **The curtain is view-paced, the store is not.** `store/settings.ts` flips
+  `theme` synchronously and touches no DOM; `shell/ThemeCurtain.tsx` owns the
+  timers, drops an opaque panel, repaints underneath it, and lifts. Same
+  division as Shut Down. The timing is `setTimeout`, **not `animationend`** —
+  jsdom never fires CSS animation events, and on the clock the whole sequence
+  steps under `vi.useFakeTimers()`. It portals into `document.body`, because
+  `.b-desktop` sets `isolation: isolate` and a menu portalled to the body would
+  otherwise paint straight over a curtain rendered inside it. Reduced motion
+  skips the curtain and swaps the palette outright.
+- A new persisted setting must be added to `tests/setup.ts`'s reset literal, or
+  it leaks between tests.
+
+## Preferences
+
+`apps/Preferences.tsx` is the settings panel: an **Appearance** box holding the
+light/dark radios, and a **Disk** box holding the node count and *Reset disk…*.
+R5 kept one preflet per setting in a Preferences folder; there is not enough
+here for a folder, so this is one panel of labelled `Box`es — the shape a
+preflet had, with more than one box in it.
+
+- **Nothing is staged, so there is no OK or Revert.** Choosing Dark drops the
+  curtain immediately and Reset asks for confirmation itself, which leaves a
+  footer with nothing to commit. The close box is the way out.
+- **This is the only place the theme changes.** The Be menu carried a *Dark
+  Mode* item for a while and no longer does — the menu is applications and
+  power, and a setting belongs in the settings panel. The radios are a view over
+  `useSettings`, never their own state, so a theme restored from localStorage
+  arrives already marked.
+- **`lib/disk.ts` owns the reset confirmation**, because About offers it too and
+  a destructive action's wording must not drift between the two places that
+  offer it. It reads the stores through `getState()` for the same reason
+  `launchApp` does: it is an action, not a subscription.
+- The radio `name` comes from `useId()`. The app is a singleton today, but a
+  second window would otherwise share the first one's radio group.
 
 ## Responsive strategy
 

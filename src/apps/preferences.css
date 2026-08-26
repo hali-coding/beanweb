@@ -1,0 +1,46 @@
+.prefs {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 10px 12px 12px;
+  background: var(--panel);
+}
+
+/* .b-box carries its own top margin for the notched label, so the first box
+   would otherwise sit lower than the padding suggests. */
+.prefs .b-box { flex: none; }
+
+.prefs-choices {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+}
+
+.prefs-note {
+  margin: 8px 0 0;
+  font-size: var(--fs-small);
+  line-height: 14px;
+  color: var(--panel-text-dim);
+}
+.prefs-note em { font-style: normal; font-weight: 700; }
+
+.prefs-specs {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 3px 14px;
+  margin: 0;
+  font-size: var(--fs-plain);
+}
+.prefs-specs dt { color: var(--panel-text-dim); }
+.prefs-specs dd { margin: 0; }
+
+.prefs-action {
+  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+.prefs-action .prefs-note { margin-top: 6px; }

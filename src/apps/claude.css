@@ -26,7 +26,7 @@
   margin: auto;
   padding: 0 12px;
   text-align: center;
-  color: var(--panel-darken-3);
+  color: var(--panel-text-faint);
   font-style: italic;
 }
 
@@ -57,7 +57,7 @@
 .claude-who {
   font-size: var(--fs-small);
   font-weight: 700;
-  color: var(--panel-darken-4);
+  color: var(--panel-text-dim);
 }
 .claude-text {
   margin: 0;
@@ -110,7 +110,7 @@
   outline: calc(2 * var(--hairline)) solid var(--navigation);
   outline-offset: -1px;
 }
-.claude-input:disabled { color: var(--panel-darken-3); }
+.claude-input:disabled { color: var(--panel-text-faint); }
 
 .claude-status {
   flex: none;
@@ -120,7 +120,7 @@
   height: 17px;
   padding: 0 6px;
   font-size: var(--fs-small);
-  color: var(--panel-darken-4);
+  color: var(--panel-text-dim);
   overflow: hidden;
   white-space: nowrap;
 }

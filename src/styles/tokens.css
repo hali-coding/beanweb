@@ -6,47 +6,18 @@
  *     tint <  1.0 -> 255 - (255 - c) * tint      (lighten)
  *     tint >= 1.0 -> c * (2 - tint)              (darken)
  * The B_*_TINT constants below are the real ones, so the ramp matches R5.
+ *
+ * Two themes. The palette lives in the two blocks below, keyed off `data-theme`
+ * on the *root element* -- menus portal into document.body, so an attribute on
+ * the desktop div would not reach them. Everything in the first block is
+ * theme-invariant: metrics, the stacking ladder, and the two desktop colours
+ * the theme curtain needs so it can paint the incoming backdrop while the root
+ * still holds the outgoing theme.
  */
 :root {
-  /* --- panel ramp, from tint_color(216, B_*_TINT) --- */
-  --panel:            #d8d8d8;             /* B_PANEL_BACKGROUND_COLOR      */
-  --panel-lighten-max:#ffffff;             /* tint 0.000                    */
-  --panel-lighten-2:  #e4e4e4;             /* tint 0.700                    */
-  --panel-lighten-1:  #dedede;             /* tint 0.833                    */
-  --panel-darken-1:   #c9c9c9;             /* tint 1.070                    */
-  --panel-darken-2:   #b5b5b5;             /* tint 1.162                    */
-  --panel-darken-3:   #838383;             /* tint 1.393                    */
-  --panel-darken-4:   #515151;             /* tint 1.626                    */
-  --panel-darken-max: #000000;             /* tint 2.000                    */
-
-  /* --- window tabs --- */
-  --tab-active:       #ffc900;             /* B_WINDOW_TAB_COLOR (255,203,0) */
-  --tab-active-lite:  #ffe066;
-  --tab-active-dark:  #d9ab00;
-  --tab-inactive:     #e8e8e8;             /* B_WINDOW_INACTIVE_TAB_COLOR    */
-  --tab-inactive-lite:#f4f4f4;
-  --tab-inactive-dark:#bcbcbc;
-  --tab-text:         #000000;
-  --tab-text-inactive:#6a6a6a;
-
-  /* --- documents, lists, text --- */
-  --document:         #ffffff;             /* B_DOCUMENT_BACKGROUND_COLOR   */
-  --document-text:    #000000;
-  --list-bg:          #ffffff;
-  --list-selected:    #aab8d6;             /* Tracker's blue-lavender       */
-  --list-selected-text:#000000;
-  --text-selection:   #b4c8e8;
-
-  /* --- accents --- */
-  --navigation:       #0000e5;             /* B_KEYBOARD_NAVIGATION_COLOR   */
-  --desktop:          #336698;             /* default workspace colour      */
-  --shine:            #ffffff;
-  --shadow:           #838383;
-
-  /* --- success/failure/alert stripes --- */
-  --alert-stop:       #cc3333;
-  --alert-warn:       #e8a020;
-  --alert-info:       #3366cc;
+  /* --- theme-invariant colours --- */
+  --desktop-light: #336698;                /* default workspace colour       */
+  --desktop-dark:  #1f3e5c;                /* tint_color(51,102,152, 1.393)  */
 
   /* --- metrics (R5 is a 12px-plain-font desktop) --- */
   --font-plain: "Bitstream Vera Sans", "DejaVu Sans", "Noto Sans", "Segoe UI", system-ui, sans-serif;
@@ -80,6 +51,131 @@
      app's close guard still has to be able to put its prompt on top of it. */
   --z-shutdown: 9850;
   --z-alert: 9900;
+  --z-boot: 10000;
+  /* The curtain covers everything, a menu still on screen included. */
+  --z-curtain: 10050;
+}
+
+/* =========================================================================
+   Light -- R5 as shipped. tint_color(216, B_*_TINT) throughout.
+   ========================================================================= */
+:root,
+:root[data-theme="light"] {
+  color-scheme: light;
+
+  /* --- panel ramp, from tint_color(216, B_*_TINT) --- */
+  --panel:            #d8d8d8;             /* B_PANEL_BACKGROUND_COLOR      */
+  --panel-lighten-max:#ffffff;             /* tint 0.000                    */
+  --panel-lighten-2:  #e4e4e4;             /* tint 0.700                    */
+  --panel-lighten-1:  #dedede;             /* tint 0.833                    */
+  --panel-darken-1:   #c9c9c9;             /* tint 1.070                    */
+  --panel-darken-2:   #b5b5b5;             /* tint 1.162                    */
+  --panel-darken-3:   #838383;             /* tint 1.393                    */
+  --panel-darken-4:   #515151;             /* tint 1.626                    */
+  --panel-darken-max: #000000;             /* tint 2.000                    */
+
+  /* --- text on panel surfaces --- */
+  --panel-text:          #000000;
+  --panel-text-dim:      #515151;          /* secondary labels              */
+  --panel-text-faint:    #838383;          /* shortcut labels, empty states */
+  --panel-text-disabled: #b5b5b5;
+  --mark:                #000000;          /* the check square / radio dot  */
+
+  /* --- window tabs --- */
+  --tab-active:       #ffc900;             /* B_WINDOW_TAB_COLOR (255,203,0) */
+  --tab-active-lite:  #ffe066;
+  --tab-active-dark:  #d9ab00;
+  --tab-inactive:     #e8e8e8;             /* B_WINDOW_INACTIVE_TAB_COLOR    */
+  --tab-inactive-lite:#f4f4f4;
+  --tab-inactive-dark:#bcbcbc;
+  --tab-text:         #000000;
+  --tab-text-inactive:#6a6a6a;
+
+  /* --- documents, lists, text --- */
+  --document:         #ffffff;             /* B_DOCUMENT_BACKGROUND_COLOR   */
+  --document-text:    #000000;
+  --list-bg:          #ffffff;
+  --list-selected:    #aab8d6;             /* Tracker's blue-lavender       */
+  --list-selected-text:#000000;
+  --text-selection:   #b4c8e8;
+
+  /* --- accents --- */
+  --navigation:       #0000e5;             /* B_KEYBOARD_NAVIGATION_COLOR   */
+  --desktop:          var(--desktop-light);
+  --desktop-text:     #ffffff;
+
+  /* --- cast shadows and the modal scrim --- */
+  --shadow-cast:      rgba(0, 0, 0, 0.28);
+  --shadow-cast-soft: rgba(0, 0, 0, 0.20); /* an unfocused window sits lower */
+  --scrim:            rgba(0, 0, 0, 0.18);
+
+  /* --- success/failure/alert stripes --- */
+  --alert-stop:       #cc3333;
+  --alert-warn:       #e8a020;
+  --alert-info:       #3366cc;
+}
+
+/* =========================================================================
+   Dark ("Dusk") -- the same desk with the lights down, not a new design.
+   Panel base 110 instead of 216; the tab is still yellow, only darker.
+
+   The *darken* arm is the real tint_color(110, B_*_TINT). The *lighten* arm is
+   deliberately not: tint < 1.0 is anchored to white, so from a base of 110 it
+   returns #ffffff for lighten-max -- a 145-step jump where light mode takes 39,
+   and a pure-white hairline on mid-grey reads as glare rather than as a bevel.
+   The lighten values below mirror light mode's proportional steps upward.
+   ========================================================================= */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  --panel:            #6e6e6e;             /* base 110                      */
+  --panel-lighten-max:#b4b4b4;             /* see the note above            */
+  --panel-lighten-2:  #838383;
+  --panel-lighten-1:  #7a7a7a;
+  --panel-darken-1:   #666666;             /* 110 x 0.930                   */
+  --panel-darken-2:   #5c5c5c;             /* 110 x 0.838                   */
+  --panel-darken-3:   #434343;             /* 110 x 0.607                   */
+  --panel-darken-4:   #292929;             /* 110 x 0.374                   */
+  --panel-darken-max: #000000;
+
+  /* The ramp means *bevel*. Text has its own tokens because the sense inverts
+     here: disabled text has to come out lighter than the panel, not darker. */
+  --panel-text:          #f2f2f2;
+  --panel-text-dim:      #d0d0d0;
+  --panel-text-faint:    #b0b0b0;
+  --panel-text-disabled: #949494;
+  --mark:                #f2f2f2;
+
+  --tab-active:       #d6a800;             /* tint 1.162 on (255,201,0)     */
+  --tab-active-lite:  #e8c44d;
+  --tab-active-dark:  #9b7a00;             /* tint 1.393                    */
+  --tab-inactive:     #5c5c5c;
+  --tab-inactive-lite:#6e6e6e;
+  --tab-inactive-dark:#434343;
+  --tab-text:         #000000;             /* black still wins on yellow    */
+  --tab-text-inactive:#a0a0a0;
+
+  --document:         #3a3a3a;
+  --document-text:    #eaeaea;
+  --list-bg:          #3a3a3a;
+  /* Picked, not derived: tint_color scales all three channels equally, so the
+     blue-lavender darkens to #676f81 -- the right hue, but too close to
+     --document to read as a selection. */
+  --list-selected:    #4a5878;
+  --list-selected-text:#f2f2f2;
+  --text-selection:   #3d5578;
+
+  --navigation:       #a8c0ff;             /* #0000e5 is invisible on dark  */
+  --desktop:          var(--desktop-dark);
+  --desktop-text:     #ffffff;
+
+  --shadow-cast:      rgba(0, 0, 0, 0.55);
+  --shadow-cast-soft: rgba(0, 0, 0, 0.42);
+  --scrim:            rgba(0, 0, 0, 0.45);
+
+  --alert-stop:       #cc3333;
+  --alert-warn:       #e8a020;
+  --alert-info:       #3366cc;
 }
 
 @media (min-resolution: 1.5dppx) {
