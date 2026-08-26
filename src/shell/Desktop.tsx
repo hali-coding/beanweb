@@ -23,6 +23,20 @@ export function Desktop() {
     launchApp('tracker', { path: '/boot/home' }, 'home')
   }, [])
 
+  // A file dropped anywhere the desktop does not handle is navigated to by the
+  // browser, which unloads the tab and takes the whole session with it. These
+  // two listeners sit on the window so they run after any app's own handler
+  // has had its turn, and only cancel the default.
+  useEffect(() => {
+    const swallow = (e: DragEvent) => e.preventDefault()
+    window.addEventListener('dragover', swallow)
+    window.addEventListener('drop', swallow)
+    return () => {
+      window.removeEventListener('dragover', swallow)
+      window.removeEventListener('drop', swallow)
+    }
+  }, [])
+
   return (
     <div className="b-desktop">
       <div className="b-workspace">
