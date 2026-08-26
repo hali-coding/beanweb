@@ -60,3 +60,14 @@ export interface KeyPromptState {
   /** Resolves with the new key, or null if the user cancelled. */
   resolve: (key: string | null) => void
 }
+
+/** Shut Down parks the desktop; Restart quits everything and boots again. */
+export type ShutdownMode = 'shutdown' | 'restart'
+
+export interface ShutdownState {
+  mode: ShutdownMode
+  /** 'quitting' walks the open windows; 'down' is the final parked screen. */
+  phase: 'quitting' | 'down'
+  /** Title of the window currently being asked to quit, for the status line. */
+  quitting: string | null
+}

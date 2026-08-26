@@ -56,6 +56,7 @@ export function Deskbar() {
   const activeId = useDesktop((s) => s.activeId)
   const focusWindow = useDesktop((s) => s.focusWindow)
   const minimizeWindow = useDesktop((s) => s.minimizeWindow)
+  const beginShutdown = useDesktop((s) => s.beginShutdown)
 
   const items: MenuItem[] = useMemo(
     () => [
@@ -65,8 +66,12 @@ export function Deskbar() {
       })),
       { separator: true },
       { label: 'About BeanWeb…', onSelect: () => launchApp('about') },
+      { separator: true },
+      // R5 spelled these without an ellipsis even though both can stop to ask.
+      { label: 'Restart', onSelect: () => void beginShutdown('restart') },
+      { label: 'Shut Down', onSelect: () => void beginShutdown('shutdown') },
     ],
-    [],
+    [beginShutdown],
   )
 
   const onAppClick = useCallback(
