@@ -25,6 +25,18 @@ if (!window.matchMedia) {
   })) as unknown as typeof window.matchMedia
 }
 
+// BasicScreen observes its stage for resizes. Nothing reaches that line today
+// -- the effect returns at getContext('2d'), which jsdom does not implement --
+// but installing the canvas package would let it through to a ReferenceError
+// far from anything the test was about. Same reasoning as matchMedia above.
+if (!globalThis.ResizeObserver) {
+  globalThis.ResizeObserver = class {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  } as unknown as typeof ResizeObserver
+}
+
 beforeEach(() => {
   localStorage.clear()
   useDesktop.setState({

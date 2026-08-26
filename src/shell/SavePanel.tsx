@@ -6,7 +6,10 @@ import { selectSavePanels, useDesktop } from '@/store/desktop'
 import type { SavePanelState } from '@/lib/types'
 
 /**
- * BFilePanel in save mode: browse to a directory, type a name, Save.
+ * BFilePanel: browse to a directory, then either type a name and Save or pick
+ * an existing file and Open. R5 had one panel class for both, and so does this
+ * one — the browser, the queue and the scrim are identical, and only the
+ * confirm rule and the labels change with `panel.mode`.
  *
  * Like alerts, only the newest panel is shown and the rest queue behind it.
  */
@@ -18,6 +21,9 @@ export function SavePanel() {
 }
 
 function SavePanelBody({ panel }: { panel: SavePanelState }) {
+  const opening = panel.mode === 'open'
+  const verb = opening ? 'Open' : 'Save'
+
   const dismiss = useDesktop((s) => s.dismissSavePanel)
   const showAlert = useDesktop((s) => s.showAlert)
 
@@ -45,31 +51,72 @@ function SavePanelBody({ panel }: { panel: SavePanelState }) {
 
   const atRoot = dir === '/'
 
-  const confirm = useCallback(async () => {
-    const trimmed = name.trim()
-    if (!trimmed) return
-    if (trimmed.includes('/')) {
-      await showAlert('stop', 'Save', 'A file name cannot contain "/".')
-      return
-    }
-    const target = joinPath(dir, trimmed)
-    const existing = nodes[target]
-    if (existing?.kind === 'dir') {
-      await showAlert('stop', 'Save', `"${trimmed}" is a folder.\nChoose another name.`)
-      return
-    }
-    if (existing) {
-      const answer = await showAlert(
-        'warn',
-        'Save',
-        `"${trimmed}" already exists.\nReplace it?`,
-        ['Cancel', 'Replace'],
-        0,
-      )
-      if (answer !== 1) return
-    }
-    dismiss(panel.id, target)
-  }, [dir, dismiss, name, nodes, panel.id, showAlert])
+  /**
+   * Navigating drops the name: one picked in the old folder does not name
+   * anything in the new one, so Open would fail on it or hit an unrelated
+   * file. Typing a folder's name clears it too -- see confirm(). Save keeps
+   * its name; the caller's suggestion is the whole point of the field there.
+   */
+  const enter = useCallback(
+    (path: string) => {
+      setDir(path)
+      if (opening) setName('')
+    },
+    [opening],
+  )
+
+  /**
+   * `chosen` is passed when a double-click picks a row, because the click that
+   * set the name is a separate event and this one must not race it.
+   */
+  const confirm = useCallback(
+    async (chosen?: string) => {
+      const trimmed = (chosen ?? name).trim()
+      if (!trimmed) return
+      if (trimmed.includes('/')) {
+        await showAlert('stop', verb, 'A file name cannot contain "/".')
+        return
+      }
+      const target = joinPath(dir, trimmed)
+      const existing = nodes[target]
+
+      if (opening) {
+        // Typing a folder's name navigates into it rather than failing, which
+        // is what the double-click on its row would have done.
+        if (existing?.kind === 'dir') {
+          enter(target)
+          return
+        }
+        if (!existing) {
+          await showAlert('stop', verb, `"${trimmed}" does not exist.`)
+          return
+        }
+        if (existing.kind !== 'text') {
+          await showAlert('stop', verb, `"${trimmed}" is not a document.`)
+          return
+        }
+        dismiss(panel.id, target)
+        return
+      }
+
+      if (existing?.kind === 'dir') {
+        await showAlert('stop', verb, `"${trimmed}" is a folder.\nChoose another name.`)
+        return
+      }
+      if (existing) {
+        const answer = await showAlert(
+          'warn',
+          verb,
+          `"${trimmed}" already exists.\nReplace it?`,
+          ['Cancel', 'Replace'],
+          0,
+        )
+        if (answer !== 1) return
+      }
+      dismiss(panel.id, target)
+    },
+    [dir, dismiss, enter, name, nodes, opening, panel.id, showAlert, verb],
+  )
 
   const cancel = useCallback(() => dismiss(panel.id, null), [dismiss, panel.id])
 
@@ -94,7 +141,7 @@ function SavePanelBody({ panel }: { panel: SavePanelState }) {
             className="savepanel-up"
             disabled={atRoot}
             aria-label="Parent folder"
-            onClick={() => setDir(dirname(dir))}
+            onClick={() => enter(dirname(dir))}
           >
             ▲
           </Button>
@@ -111,7 +158,12 @@ function SavePanelBody({ panel }: { panel: SavePanelState }) {
                 type="button"
                 className="savepanel-row"
                 data-dim={node.kind === 'app'}
-                onDoubleClick={() => node.kind === 'dir' && setDir(node.path)}
+                data-selected={node.kind === 'text' && node.name === name}
+                onDoubleClick={() => {
+                  if (node.kind === 'dir') enter(node.path)
+                  // Opening is a pick, so a double-click finishes the panel.
+                  else if (opening && node.kind === 'text') void confirm(node.name)
+                }}
                 onClick={() => {
                   // Clicking a file adopts its name; folders need a double-click
                   // to enter, matching Tracker.
@@ -126,7 +178,7 @@ function SavePanelBody({ panel }: { panel: SavePanelState }) {
         </ScrollView>
 
         <div className="savepanel-name">
-          <label htmlFor="savepanel-name-field">Save as:</label>
+          <label htmlFor="savepanel-name-field">{opening ? 'Open:' : 'Save as:'}</label>
           <TextControl
             id="savepanel-name-field"
             ref={nameRef}
@@ -140,7 +192,7 @@ function SavePanelBody({ panel }: { panel: SavePanelState }) {
         <div className="savepanel-buttons">
           <Button onClick={cancel}>Cancel</Button>
           <Button isDefault disabled={!name.trim()} onClick={() => void confirm()}>
-            Save
+            {verb}
           </Button>
         </div>
       </div>

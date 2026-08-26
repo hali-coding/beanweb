@@ -11,7 +11,7 @@ npm run dev        # Vite dev server with HMR
 npm run build      # tsc -b && vite build  -> dist/
 npm run preview    # serve the production build
 npm run typecheck  # types only
-npm test           # vitest run  (65 tests)
+npm test           # vitest run  (296 tests)
 npm run test:watch # vitest, watch mode
 ```
 
@@ -22,7 +22,10 @@ CI runs typecheck -> test -> build on every PR
 
 `tests/` holds a Vitest + jsdom suite. `fs` and `desktop` are pure store tests;
 `tetris` and `shell` render real components with Testing Library. `shell`
-mounts the whole `<Desktop />` and drives it the way a user would.
+mounts the whole `<Desktop />` and drives it the way a user would. `graphics`
+drives the BASIC screen through real BASIC source rather than calling `Screen`
+directly — the bugs worth catching live in the seams between STEP, VIEW and
+WINDOW, and a unit test on `Screen.pset` would miss every one.
 
 Five things bite repeatedly here, all learned the hard way:
 
@@ -43,7 +46,10 @@ Five things bite repeatedly here, all learned the hard way:
   Wait on the window count instead.
 
 jsdom has no layout engine, so `offsetWidth` is always 0. Anything about size,
-position or overflow cannot be tested here and needs a real browser.
+position or overflow cannot be tested here and needs a real browser. jsdom has
+no canvas either: `Screen` is pure data so its pixels test fine, but *that they
+reach a canvas* does not, and the screen window's fit arithmetic cannot either.
+Both have already been wrong while the suite was green — drive the browser.
 
 ## Architecture
 
@@ -96,6 +102,83 @@ would only cover one of the three. `closeWindow` is the unguarded escape hatch
 and should stay that way. Guards live in a module-level Map (`lib/closeGuards`)
 rather than the store because they are functions nothing renders, and are read
 through a ref so they never see a stale `dirty` flag.
+
+## BASIC graphics and the screen window
+
+The BASIC editor and the program's screen are **two windows**. `apps/Basic.tsx`
+holds the listing and a console transcript; `apps/BasicScreen.tsx` is the
+program's actual display, text and pixels together, the way QBasic's output
+screen was a separate thing from its editor.
+
+- **The screen window opens by itself**, the first time a program draws and
+  again on every SCREEN mode change. A program that only prints never opens
+  one. *Run -> Show screen* opens it by hand.
+- **F5 runs and Esc breaks, but only Esc is window-local.** The editor handles
+  both on its app root, so they fire from the listing, the console and the
+  INPUT box. The screen window handles F5 as well — pressed there it would
+  otherwise reload the tab and take the desktop with it — and reaches the
+  editor's controls through `session.run` / `session.stop`, mutable fields the
+  editor installs in an effect. Esc is deliberately *not* stolen there:
+  `inkeyFor` reports it as `CHR$(27)` and listings that quit on Escape need to
+  see it. To stop such a program, press Esc in the editor window.
+- **The two windows meet in `lib/basic/session.ts`**, a module-level Map keyed
+  by the editor's window id — the same reasoning as `lib/closeGuards`. What
+  passes between them is a `Screen` mutated thousands of times a second and a
+  keyboard queue; a Zustand store would mean a store write per pixel.
+  `createSession` runs during render but the teardown is an effect, so the
+  effect must `attachSession` on the way in — React runs mount/cleanup/mount in
+  development, and the throwaway pass's cleanup would otherwise unregister a
+  session nothing creates again.
+- **The screen never re-renders React.** The interpreter mutates `Screen` and
+  bumps `version`; the window polls it on `requestAnimationFrame` and blits
+  only when it moved. Same rule as window drags and the Claude token stream.
+
+`lib/basic/screen.ts` is pure data — no canvas, no DOM — which is what lets the
+whole graphics layer be tested under jsdom.
+
+- **Colours are attribute indices, never RGB.** That is what makes PALETTE work
+  (remapping an attribute recolours every pixel already drawn with it) and what
+  lets POINT return the number the program passed to PSET.
+- **Text is a second layer over the pixels, not written into them.** Hardware
+  wrote glyphs straight to video memory, so a line drawn through text erased
+  it. Here it does not. The trade buys exact LOCATE, exact scrolling, and text
+  PAINT cannot flood through; a cell never written stays transparent, which is
+  why the char code `0` means "empty" and a printed space does not.
+- **Aspect is one formula, `pixelAspect(displayW, displayH)`.** The window
+  stretches by it and CIRCLE's default aspect ratio is its reciprocal, so a
+  circle comes out round in every mode without a per-mode constant.
+- **The screen window sizes its canvas in JavaScript**, not with `aspect-ratio`.
+  The ratio wanted is not the bitmap's — a 320x200 screen must be shown 320x240
+  — and CSS cannot letterbox against both axes without the used width
+  collapsing to the canvas's intrinsic size. Measure the stage's *content* box:
+  `clientWidth` counts its padding, and flex then quietly shrinks the frame
+  back, distorting the picture by exactly that much.
+- **GET/PUT keep sprites beside the array, not packed into it.** The array gets
+  the two header words a listing might read; the packed pixel body is the one
+  thing not reproduced, so GET-then-PUT is exact and poking at the bytes is not
+  supported.
+- **PAINT is a scanline fill with an explicit stack.** The recursive version
+  blows the JS stack about a third of the way across a 640x480 screen, which a
+  program filling its background does on the first statement.
+- `font.ts` is an original 8x8 face, like the icons. Modes with taller cells
+  (8x14 in SCREEN 9, 8x16 in SCREEN 0/11/12) letterbox it rather than switching
+  to a second face, so text there is airier than a real VGA drew it while still
+  landing on the exact cell LOCATE names.
+
+Implemented: SCREEN 0/1/2/7/8/9/11/12/13, PSET, PRESET, LINE (incl. STEP, B,
+BF, style masks), CIRCLE (incl. arcs, pie slices, aspect), PAINT, DRAW, COLOR,
+LOCATE, CLS 0/1/2, VIEW, VIEW PRINT, WINDOW, PALETTE, PALETTE USING, GET, PUT,
+WIDTH, POINT, PMAP, CSRLIN, POS, SCREEN(), TAB, SPC, INKEY$, SLEEP.
+
+Not implemented, deliberately: `DRAW "X"` (needs `VARPTR$`, and there is no
+memory model to fake); PAINT's string tile patterns; video pages; SCREEN 3/4/10
+(Hercules and mono EGA). BEEP, SOUND and PLAY parse and run so a listing is not
+stopped by them, but nothing is heard.
+
+`GORILLA.BAS` is the target `tests/gorilla.test.ts` measures against, and it
+still does not compile. The graphics it needs are all here now; what is left is
+language, not drawing — user-defined `TYPE`s first, then `DEFINT`, `STATIC`,
+`ON ERROR`, `DEF SEG`/`PEEK`/`POKE` and `ERASE`.
 
 ### Adding an app
 
@@ -174,6 +257,10 @@ because the project has no backend to proxy through.
   says so. Haiku 4.5 predates adaptive thinking and 400s if it is sent.
 - Prices are **not** in the Models API. `PRICES` in `lib/models.ts` is a cached
   table and will drift; unpriced models still work, they just sort last.
+- **Price is never shown to the user.** It orders the picker cheapest first and
+  pins `DEFAULT_MODEL`, and that is all it is for — the menu and the status bar
+  carry the model's name and nothing else. A cached table drifting is a
+  cosmetic problem only as long as it stays off screen; do not put it back.
 - `pollModels` keeps its in-flight guard in a **ref**, not state. Depending on a
   flag the callback also sets would re-fire the effect that calls it — the same
   infinite-loop shape as the `useShallow` rule above.
@@ -186,7 +273,12 @@ because the project has no backend to proxy through.
 ## Conventions
 
 - R5 used **Alt** for shortcuts where other systems use Ctrl. Keep it that way
-  (`Alt+W` close, `Alt+Tab` cycle); leave Ctrl to the browser.
+  (`Alt+W` close, `Alt+O` open, `Alt+S` save, `Alt+Tab` cycle); leave Ctrl to
+  the browser. BASIC's `F5` and `Esc` are the deliberate exception — they are
+  QBasic's keys, and the app is imitating QBasic, not the Tracker.
+- **A menu `shortcut:` label is only a label.** Nothing binds it; the app still
+  needs the key in its own `onKeyDown`. BASIC advertised `Alt+S` for a while
+  without handling it.
 - Menus render through a portal into `document.body` so window `overflow:
   hidden` cannot clip them.
 - **Click-to-focus needs `preventDefault()`.** Calling `.focus()` from a
@@ -207,9 +299,15 @@ because the project has no backend to proxy through.
   or the transparent strip beside the tab silently eats clicks.
 - Modals are promise-based and queue in the store, newest on top:
   `showAlert(kind, title, text, buttons, default)` resolves to the index of the
-  button pressed, and `showSavePanel(title, directory, name)` resolves to the
-  chosen path or `null` if cancelled. `SavePanel` renders before `Alerts` in
-  `Desktop`, so its own overwrite confirmation paints above it.
+  button pressed, and `showSavePanel(title, directory, name)` /
+  `showOpenPanel(title, directory)` resolve to the chosen path or `null` if
+  cancelled. `SavePanel` renders before `Alerts` in `Desktop`, so its own
+  overwrite confirmation paints above it.
+- **One file panel serves both modes.** Save and open share a queue, a
+  component and a `SavePanelState`; `mode` picks the confirm rule (save asks
+  before replacing, open refuses a name that is not a document and treats a
+  folder name as a navigation) and the labels. Do not fork a second component
+  for it — R5 had one `BFilePanel` too.
 - **A cancelled save must cancel the close.** `save()` returns `string | null`;
   StyledEdit's close guard returns `false` when it gets `null`, otherwise
   backing out of the save panel would still throw the document away.

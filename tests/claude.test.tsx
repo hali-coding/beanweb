@@ -325,6 +325,12 @@ describe('Claude chat', () => {
       return $$('.b-menu-item').map((n) => n.textContent?.replace('•', '').trim() ?? '')
     }
 
+    /**
+     * The model rows alone. Nothing in the label distinguishes them any more
+     * now that the price is gone, but "Refresh model list" is always last.
+     */
+    const modelRows = async () => (await openModelMenu()).slice(0, -1)
+
     it('defaults to the cheapest model', () => {
       expect(useSettings.getState().model).toBe('claude-haiku-4-5')
       mount()
@@ -333,11 +339,17 @@ describe('Claude chat', () => {
 
     it('lists fallback models cheapest first before any poll', async () => {
       mount()
+      const rows = await modelRows()
+      expect(rows[0]).toBe('claude-haiku-4-5')
+      expect(rows.at(-1)).toBe('claude-opus-5')
+    })
+
+    it('names models without quoting a price at them', async () => {
+      mount()
       const items = await openModelMenu()
-      const priced = items.filter((t) => t.includes('per Mtok'))
-      expect(priced[0]).toContain('claude-haiku-4-5')
-      expect(priced[0]).toContain('$1/$5')
-      expect(priced.at(-1)).toContain('claude-opus-5')
+      expect(items.join(' ')).not.toMatch(/\$|Mtok/)
+      expect($('.claude-status')?.textContent).not.toMatch(/\$|Mtok/)
+      expect($('.claude-status span')?.getAttribute('title')).toBeNull()
     })
 
     it('polls the API once a key is present and shows what came back', async () => {
@@ -351,11 +363,8 @@ describe('Claude chat', () => {
       mount()
       await waitFor(() => expect(listFn).toHaveBeenCalled())
 
-      const items = await openModelMenu()
-      const priced = items.filter((t) => t.includes('per Mtok'))
       // Sorted by price, and using the API's display names.
-      expect(priced[0]).toContain('Claude Haiku 4.5')
-      expect(priced[1]).toContain('Claude Opus 5')
+      expect(await modelRows()).toEqual(['Claude Haiku 4.5', 'Claude Opus 5'])
     })
 
     it('polls once per key, not in a loop', async () => {
@@ -377,8 +386,7 @@ describe('Claude chat', () => {
       await waitFor(() => expect(listFn).toHaveBeenCalled())
       // A background poll must not raise an alert or empty the picker.
       expect(alertText()).toBeNull()
-      const items = await openModelMenu()
-      expect(items.filter((t) => t.includes('per Mtok')).length).toBeGreaterThan(0)
+      expect(await modelRows()).toEqual(['claude-haiku-4-5', 'claude-sonnet-5', 'claude-opus-5'])
     })
 
     it('switches model and persists the choice', async () => {

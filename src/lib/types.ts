@@ -38,12 +38,16 @@ export interface AlertState {
   resolve: (index: number) => void
 }
 
+/** Save names a file that need not exist yet; open picks one that does. */
+export type FilePanelMode = 'save' | 'open'
+
 export interface SavePanelState {
   id: string
+  mode: FilePanelMode
   title: string
   /** Directory the panel is browsing. */
   directory: string
-  /** Pre-filled file name. */
+  /** Pre-filled file name. Empty in open mode until a row is picked. */
   name: string
   /** Resolves with the chosen path, or null if the user cancelled. */
   resolve: (path: string | null) => void

@@ -1,0 +1,136 @@
+.basic {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  background: var(--panel);
+  /* One place for the editor metrics: the gutter and the source must agree
+     exactly or the line numbers drift out of alignment. */
+  --code-font: var(--font-fixed);
+  --code-size: 12px;
+  --code-line: 16px;
+  --code-pad: 4px;
+}
+
+/* ------------------------------------------------------------- editor */
+.basic-editor {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  margin: 4px 4px 0;
+  background: var(--document);
+  box-shadow:
+    inset var(--hairline) var(--hairline) 0 0 var(--panel-darken-3),
+    inset calc(-1 * var(--hairline)) calc(-1 * var(--hairline)) 0 0 var(--panel-lighten-max),
+    inset calc(2 * var(--hairline)) calc(2 * var(--hairline)) 0 0 var(--panel-darken-2),
+    inset calc(-2 * var(--hairline)) calc(-2 * var(--hairline)) 0 0 var(--panel-lighten-1);
+}
+
+.basic-gutter {
+  flex: none;
+  width: 34px;
+  margin: 0;
+  padding: var(--code-pad) 4px var(--code-pad) 0;
+  overflow: hidden;
+  text-align: right;
+  font-family: var(--code-font);
+  font-size: var(--code-size);
+  line-height: var(--code-line);
+  color: var(--panel-darken-3);
+  background: var(--panel-lighten-2);
+  box-shadow: inset calc(-1 * var(--hairline)) 0 0 0 var(--panel-darken-2);
+  user-select: none;
+}
+
+.basic-source {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  padding: var(--code-pad) 6px;
+  border: none;
+  outline: none;
+  resize: none;
+  background: transparent;
+  color: var(--document-text);
+  font-family: var(--code-font);
+  font-size: var(--code-size);
+  line-height: var(--code-line);
+  white-space: pre;
+}
+.basic-source:focus {
+  outline: calc(2 * var(--hairline)) solid var(--navigation);
+  outline-offset: -1px;
+}
+
+/* --------------------------------------------------------------- bar */
+.basic-bar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px;
+}
+.basic-state {
+  font-size: var(--fs-small);
+  color: var(--panel-darken-4);
+}
+
+/* ----------------------------------------------------------- console */
+.basic-console {
+  flex: 0 0 38%;
+  min-height: 70px;
+  margin: 0 4px 4px;
+  padding: 4px 6px;
+  background: #101010;
+  color: #e6e6e6;
+  font-family: var(--code-font);
+  font-size: var(--code-size);
+  line-height: var(--code-line);
+  scrollbar-color: #3a3a3a #1b1b1b;
+  box-shadow:
+    inset var(--hairline) var(--hairline) 0 0 var(--panel-darken-3),
+    inset calc(-1 * var(--hairline)) calc(-1 * var(--hairline)) 0 0 var(--panel-lighten-max);
+}
+.basic-console::-webkit-scrollbar { background: #1b1b1b; }
+.basic-console::-webkit-scrollbar-track { background: #1b1b1b; box-shadow: none; }
+.basic-console::-webkit-scrollbar-thumb {
+  background: #3a3a3a;
+  background-image: none;
+  box-shadow:
+    inset var(--hairline) var(--hairline) 0 0 #585858,
+    inset calc(-1 * var(--hairline)) calc(-1 * var(--hairline)) 0 0 #101010;
+}
+.basic-console::-webkit-scrollbar-button:single-button { background-color: #2a2a2a; box-shadow: none; }
+
+.basic-output {
+  margin: 0;
+  font: inherit;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.basic-input-row {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+.basic-prompt {
+  flex: none;
+  color: #ffc900;
+}
+.basic-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: #e6e6e6;
+  font: inherit;
+  caret-color: #5ee06a;
+}
+
+@media (pointer: coarse) {
+  .basic { --code-size: 13px; --code-line: 19px; }
+  .basic-console { flex-basis: 32%; }
+}

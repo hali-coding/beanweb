@@ -8,7 +8,6 @@ import { useDesktop } from '@/store/desktop'
 import { maskKey, useSettings } from '@/store/settings'
 import {
   FALLBACK_MODELS,
-  formatPrice,
   requestShape,
   sortByPrice,
   toOption,
@@ -308,7 +307,7 @@ export function Claude({ windowId }: AppProps) {
         title: 'Model',
         items: [
           ...sortByPrice(models).map((m) => ({
-            label: `${m.name} — ${formatPrice(m.price)}`,
+            label: m.name,
             checked: m.id === model,
             onSelect: () => setModel(m.id),
           })),
@@ -396,7 +395,7 @@ export function Claude({ windowId }: AppProps) {
       </div>
 
       <div className="claude-status b-fixed">
-        <span title={formatPrice(selected?.price)}>{selected?.name ?? model}</span>
+        <span>{selected?.name ?? model}</span>
         <span className="b-spacer" />
         <span>{usage ?? `key ${maskKey(apiKey)}`}</span>
       </div>

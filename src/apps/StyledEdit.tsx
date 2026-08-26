@@ -26,6 +26,7 @@ export function StyledEdit({ windowId, args }: AppProps) {
   const setTitle = useDesktop((s) => s.setTitle)
   const showAlert = useDesktop((s) => s.showAlert)
   const showSavePanel = useDesktop((s) => s.showSavePanel)
+  const showOpenPanel = useDesktop((s) => s.showOpenPanel)
   const requestClose = useDesktop((s) => s.requestClose)
 
   // Load the file once per path. Later external writes are deliberately not
@@ -62,30 +63,58 @@ export function StyledEdit({ windowId, args }: AppProps) {
     return path
   }, [path, saveAs, text, write])
 
-  // Registered as this window's close guard, so *every* close path -- the tab's
-  // close box, Alt+W and File > Close -- gets the same prompt. Returning false
-  // cancels the close.
-  const confirmClose = useCallback(async () => {
-    if (!dirty) return true
-    const answer = await showAlert(
-      'warn',
-      'StyledEdit',
-      `Save changes to "${path ? basename(path) : 'Untitled'}" before closing?`,
-      ['Cancel', "Don't save", 'Save'],
-      2,
-    )
-    if (answer === 0) return false
-    if (answer === 2 && !(await save())) return false // save panel cancelled
-    return true
-  }, [dirty, path, save, showAlert])
+  /**
+   * Anything that throws the document away asks first. `what` finishes the
+   * sentence, so closing and opening another file read as the same prompt.
+   * Returns false to abort whatever was about to happen.
+   */
+  const confirmDiscard = useCallback(
+    async (what: string) => {
+      if (!dirty) return true
+      const answer = await showAlert(
+        'warn',
+        'StyledEdit',
+        `Save changes to "${path ? basename(path) : 'Untitled'}" ${what}`,
+        ['Cancel', "Don't save", 'Save'],
+        2,
+      )
+      if (answer === 0) return false
+      if (answer === 2 && !(await save())) return false // save panel cancelled
+      return true
+    },
+    [dirty, path, save, showAlert],
+  )
 
-  useCloseGuard(windowId, confirmClose)
+  // Registered as this window's close guard, so *every* close path -- the tab's
+  // close box, Alt+W and File > Close -- gets the same prompt.
+  useCloseGuard(windowId, () => confirmDiscard('before closing?'))
+
+  /**
+   * Replace the document in this window with one from disk.
+   *
+   * The text is set here rather than left to the load effect: reopening the
+   * file already showing does not change `path`, so the effect would not run
+   * and a modified buffer would never revert.
+   */
+  const open = useCallback(async () => {
+    if (!(await confirmDiscard('before opening another?'))) return
+    const target = await showOpenPanel(
+      'Open document',
+      path ? dirname(path) : '/boot/home/documents',
+    )
+    if (!target) return
+    setText(read(target) ?? '')
+    setPath(target)
+    setDirty(false)
+  }, [confirmDiscard, path, read, showOpenPanel])
 
   const menus: MenuDef[] = useMemo(
     () => [
       {
         title: 'File',
         items: [
+          { label: 'Open…', shortcut: 'Alt+O', onSelect: () => void open() },
+          { separator: true },
           { label: 'Save', shortcut: 'Alt+S', disabled: !dirty && Boolean(path), onSelect: () => void save() },
           { label: 'Save as…', onSelect: () => void saveAs() },
           { separator: true },
@@ -128,18 +157,23 @@ export function StyledEdit({ windowId, args }: AppProps) {
         ],
       },
     ],
-    [requestClose, dirty, fontSize, monospace, path, save, saveAs, wrap, windowId],
+    [requestClose, dirty, fontSize, monospace, open, path, save, saveAs, wrap, windowId],
   )
 
   const onKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
       // R5 used Alt for shortcuts where other systems use Control.
-      if (e.altKey && e.key.toLowerCase() === 's') {
+      if (!e.altKey) return
+      const key = e.key.toLowerCase()
+      if (key === 's') {
         e.preventDefault()
         void save()
+      } else if (key === 'o') {
+        e.preventDefault()
+        void open()
       }
     },
-    [save],
+    [open, save],
   )
 
   return (

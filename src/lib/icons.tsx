@@ -181,3 +181,33 @@ export function ClaudeIcon({ size = 32, className }: IconProps) {
     </svg>
   )
 }
+
+/** A listing on a screen: line numbers down the left, code to the right. */
+export function BasicIcon({ size = 32, className }: IconProps) {
+  return (
+    <svg {...box(size)} className={className}>
+      <rect x="3" y="5" width="26" height="22" rx="2" fill="#f4f2e8" stroke="#3b3b3b" strokeWidth="1.5" />
+      <rect x="3" y="5" width="7" height="22" fill="#dcd8c4" stroke="#3b3b3b" strokeWidth="1.5" />
+      <g stroke="#6a6a6a" strokeWidth="1.4" strokeLinecap="round">
+        <path d="M5.5 10h3M5.5 15h3M5.5 20h3" />
+      </g>
+      <g stroke="#2f6ea8" strokeWidth="1.8" strokeLinecap="round">
+        <path d="M13 10h12M13 15h8M13 20h10" />
+      </g>
+    </svg>
+  )
+}
+
+/** A CRT showing a picture: the BASIC program's own screen, not its listing. */
+export function ScreenIcon({ size = 32, className }: IconProps) {
+  return (
+    <svg {...box(size)} className={className}>
+      <rect x="2" y="4" width="28" height="20" rx="2" fill="#3b3b3b" />
+      <rect x="4.5" y="6.5" width="23" height="15" fill="#101a3c" />
+      <path d="M4.5 21.5 11 13l4.5 5 4-4.5 8 8Z" fill="#2f6ea8" />
+      <circle cx="22" cy="10.5" r="2.5" fill="#ffc900" />
+      <path d="M12 24h8l1 3.5H11Z" fill="#8f8f8f" />
+      <rect x="8" y="27" width="16" height="2" rx="1" fill="#6a6a6a" />
+    </svg>
+  )
+}
