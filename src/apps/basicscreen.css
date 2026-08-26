@@ -1,0 +1,90 @@
+.bscreen {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  background: var(--panel);
+  outline: none;
+}
+
+/* Focus is not decoration here -- the surface holding it is where INKEY$ reads
+   its keys -- so the ring the rest of the UI uses has to be put back. Inset by
+   a pixel like BTextControl's, because the window content box clips and an
+   outline drawn outside the surface would be cut off. */
+.bscreen:focus-visible {
+  outline: calc(2 * var(--hairline)) solid var(--navigation);
+  outline-offset: -1px;
+}
+
+/* The stage is the black surround a monitor had around its picture; the frame
+   inside it holds the picture's own aspect ratio, which the mode decides. */
+.bscreen-stage {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 4px;
+  padding: 6px;
+  background: #000;
+  box-shadow:
+    inset var(--hairline) var(--hairline) 0 0 var(--panel-darken-3),
+    inset calc(-1 * var(--hairline)) calc(-1 * var(--hairline)) 0 0 var(--panel-lighten-max),
+    inset calc(2 * var(--hairline)) calc(2 * var(--hairline)) 0 0 var(--panel-darken-2),
+    inset calc(-2 * var(--hairline)) calc(-2 * var(--hairline)) 0 0 var(--panel-lighten-1);
+}
+
+/* Sized in pixels by the app, which is the only way to letterbox against both
+   axes at a ratio that is not the bitmap's own. See BasicScreen.tsx. */
+.bscreen-frame {
+  display: flex;
+  /* Never let flex resize what the app measured. */
+  flex: none;
+  width: 100%;
+  height: 100%;
+}
+
+.bscreen-canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+  /* A 320-pixel screen blown up to 640 must stay blocky. Smoothing it would
+     turn a deliberately chunky picture into a blurry one. */
+  image-rendering: pixelated;
+}
+
+.bscreen-status {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 2px 6px 4px;
+  font-size: var(--fs-small);
+  color: var(--panel-darken-4);
+}
+
+.bscreen-jump {
+  padding: 0;
+  border: none;
+  background: none;
+  font: inherit;
+  color: var(--navigation);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.bscreen--orphan {
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  text-align: center;
+  font-size: var(--fs-small);
+  color: var(--panel-darken-4);
+}
+
+@media (max-width: 768px) {
+  .bscreen-stage {
+    margin: 0;
+    padding: 2px;
+  }
+}

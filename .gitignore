@@ -5,3 +5,8 @@ dist-ssr
 *.local
 .DS_Store
 node_modules/.tmp
+IDEAS.md
+
+
+# driver screenshots
+.claude/skills/run-beanweb/shots/

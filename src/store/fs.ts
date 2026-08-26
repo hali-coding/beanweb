@@ -98,6 +98,82 @@ Terminal
   open, clear, date, uname, help
 `
 
+const HELLO_BAS = `10 REM The traditional first program
+20 PRINT "HELLO, WORLD"
+30 FOR I = 1 TO 5
+40 PRINT I; "SQUARED IS"; I * I
+50 NEXT I
+60 END
+`
+
+const GUESS_BAS = `10 REM Higher or lower. Press Stop to give up.
+20 LET N = 42
+30 LET T = 0
+40 INPUT "GUESS 1 TO 100"; G
+50 LET T = T + 1
+60 IF G < N THEN PRINT "HIGHER" : GOTO 40
+70 IF G > N THEN PRINT "LOWER" : GOTO 40
+80 PRINT "GOT IT IN"; T; "TRIES"
+90 END
+`
+
+const STARS_BAS = `' A starfield, to show the screen window off.
+' Graphics open a window of their own; press a key to stop.
+SCREEN 13
+RANDOMIZE TIMER
+
+CONST COUNT = 120
+DIM x(COUNT), y(COUNT), speed(COUNT)
+
+FOR i = 1 TO COUNT
+  x(i) = RND * 319
+  y(i) = RND * 199
+  speed(i) = 1 + INT(RND * 3)
+NEXT i
+
+DO
+  FOR i = 1 TO COUNT
+    PRESET (x(i), y(i))
+    x(i) = x(i) - speed(i)
+    IF x(i) < 0 THEN
+      x(i) = 319
+      y(i) = RND * 199
+    END IF
+    PSET (x(i), y(i)), 16 + speed(i) * 5
+  NEXT i
+LOOP UNTIL INKEY$ <> ""
+
+SCREEN 0
+PRINT "Goodbye."
+`
+
+const SUNSET_BAS = `' Every graphics statement this BASIC knows, in one picture.
+SCREEN 13
+
+' Sky: one filled line per row, walking up the palette.
+FOR i = 0 TO 199
+  LINE (0, i)-(319, i), 17 + INT(i / 10)
+NEXT i
+
+' Sun, drawn as an outline and then flooded.
+CIRCLE (160, 90), 40, 44
+PAINT (160, 90), 44, 44
+
+' Rays: an arc apiece, stepping round the circle.
+FOR a = 0 TO 5
+  CIRCLE (160, 90), 55, 44, a * 1.05, a * 1.05 + .4
+NEXT a
+
+' Sea, and a boat drawn with the macro language.
+LINE (0, 150)-(319, 199), 1, BF
+DRAW "C15 BM130,150 R60 G10 L40 H10"
+DRAW "C15 BM160,150 U25 F25"
+
+LOCATE 24, 10
+COLOR 15
+PRINT "BEANWEB QBASIC";
+`
+
 function seed(): Record<string, FsNode> {
   const nodes: FsNode[] = [
     dir('/'),
@@ -106,6 +182,7 @@ function seed(): Record<string, FsNode> {
     dir('/boot/home/Desktop'),
     dir('/boot/home/config'),
     dir('/boot/home/documents'),
+    dir('/boot/home/basic'),
     dir('/boot/apps'),
     dir('/boot/system'),
 
@@ -121,10 +198,16 @@ function seed(): Record<string, FsNode> {
       'BeanWeb 0.1.0\nkernel: javascript\nabi: dom\n',
     ),
 
+    file('/boot/home/basic/hello.bas', HELLO_BAS),
+    file('/boot/home/basic/guess.bas', GUESS_BAS),
+    file('/boot/home/basic/sunset.bas', SUNSET_BAS),
+    file('/boot/home/basic/stars.bas', STARS_BAS),
+
     app('/boot/apps/Tracker', 'tracker'),
     app('/boot/apps/Terminal', 'terminal'),
     app('/boot/apps/StyledEdit', 'styledit'),
     app('/boot/apps/Tetris', 'tetris'),
+    app('/boot/apps/BASIC', 'basic'),
     app('/boot/apps/Claude', 'claude'),
   ]
   return Object.fromEntries(nodes.map((n) => [n.path, n]))

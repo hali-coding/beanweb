@@ -6,7 +6,7 @@ import { FolderIcon, TextFileIcon, AppIcon, TrackerIcon } from '@/lib/icons'
 import type { FsNode } from '@/store/fs'
 import { basename, dirname, joinPath, useFs } from '@/store/fs'
 import { useDesktop } from '@/store/desktop'
-import { launchApp, registerApp } from './registry'
+import { getApp, launchApp, registerApp } from './registry'
 import type { AppProps } from './registry'
 import './tracker.css'
 
@@ -14,7 +14,10 @@ type ViewMode = 'icon' | 'list'
 
 function iconFor(node: FsNode, size: number) {
   if (node.kind === 'dir') return <FolderIcon size={size} />
-  if (node.kind === 'app') return <AppIcon size={size} />
+  if (node.kind === 'app') {
+    const Icon = (node.appId && getApp(node.appId)?.icon) || AppIcon
+    return <Icon size={size} />
+  }
   return <TextFileIcon size={size} />
 }
 
@@ -69,6 +72,9 @@ export function Tracker({ windowId, args }: AppProps) {
         navigate(node.path)
       } else if (node.kind === 'app' && node.appId) {
         launchApp(node.appId)
+      } else if (node.name.toLowerCase().endsWith('.bas')) {
+        // Programs open in the interpreter, everything else in the editor.
+        launchApp('basic', { path: node.path }, node.name)
       } else {
         launchApp('styledit', { path: node.path }, node.name)
       }

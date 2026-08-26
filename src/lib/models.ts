@@ -6,7 +6,11 @@ import type Anthropic from '@anthropic-ai/sdk'
  * The Models API reports id, display name, context window, output cap and
  * capabilities — but *not* price. Pricing therefore comes from the table below,
  * which is a cached snapshot and can drift; models missing from it still work,
- * they just sort last and show no price.
+ * they just sort last.
+ *
+ * Price is never shown in the app. It exists to order the picker cheapest
+ * first and to pin `DEFAULT_MODEL`, which is why a stale rate is a cosmetic
+ * problem here and not a lie told to the user.
  */
 
 export interface Price {
@@ -91,10 +95,6 @@ export function sortByPrice(models: ModelOption[]): ModelOption[] {
     if (b.price) return 1
     return a.name.localeCompare(b.name)
   })
-}
-
-export function formatPrice(price?: Price): string {
-  return price ? `$${price.input}/$${price.output} per Mtok` : 'price unknown'
 }
 
 /**

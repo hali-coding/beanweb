@@ -251,7 +251,7 @@
   to { opacity: 0; visibility: hidden; }
 }
 
-/* ------------------------------------------------------- BFilePanel (save) */
+/* ------------------------------------------------ BFilePanel (save / open) */
 .savepanel {
   width: min(400px, 100%);
   max-height: min(440px, 100%);
@@ -327,6 +327,11 @@
 }
 .savepanel-row:hover { background: var(--panel-lighten-2); }
 .savepanel-row[data-dim='true'] { color: var(--panel-darken-3); }
+.savepanel-row[data-selected='true'],
+.savepanel-row[data-selected='true']:hover {
+  background: var(--list-selected);
+  color: var(--list-selected-text);
+}
 .savepanel-row-name {
   overflow: hidden;
   text-overflow: ellipsis;

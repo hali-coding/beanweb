@@ -84,6 +84,7 @@ export function Terminal({ windowId, args }: AppProps) {
               'pwd             print working directory',
               'cat <file>      print a file',
               'edit <file>     open a file in StyledEdit',
+              'basic <file>    open a program in BASIC',
               'open <app>      launch an application',
               'mkdir <dir>     create a directory',
               'touch <file>    create an empty file',
@@ -136,8 +137,18 @@ export function Terminal({ windowId, args }: AppProps) {
         case 'edit': {
           if (!arg) return emit('edit: missing operand', 'err')
           const target = resolvePath(cwd, arg)
+          if (state.nodes[target]?.kind === 'dir') return emit(`edit: ${arg}: is a directory`, 'err')
           if (!state.nodes[target]) state.write(target, '')
           launchApp('styledit', { path: target }, basename(target))
+          break
+        }
+
+        case 'basic': {
+          if (!arg) return emit('basic: missing operand', 'err')
+          const target = resolvePath(cwd, arg)
+          if (state.nodes[target]?.kind === 'dir') return emit(`basic: ${arg}: is a directory`, 'err')
+          if (!state.nodes[target]) state.write(target, '')
+          launchApp('basic', { path: target }, basename(target))
           break
         }
 
@@ -223,6 +234,13 @@ export function Terminal({ windowId, args }: AppProps) {
   const onKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLInputElement>) => {
       if (e.key === 'Enter') {
+        // A command that opens a window hands focus to it inside this very
+        // dispatch, and the browser then performs Enter's default action
+        // against whatever now holds focus -- typing a newline into the app
+        // just launched. `basic <file>` used to land one in the editor, whose
+        // onChange then overwrote the file it had just loaded. Same family as
+        // the click-to-focus rule: the default action has to be cancelled.
+        e.preventDefault()
         run(input)
         if (input.trim()) setHistory((h) => [...h, input])
         setInput('')

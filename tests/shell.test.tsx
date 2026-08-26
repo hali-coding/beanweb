@@ -87,6 +87,20 @@ describe('Tracker', () => {
 })
 
 describe('Terminal', () => {
+  it('cancels Enter, so a launched app does not receive the keystroke', async () => {
+    render(<Desktop />)
+    await launch('Terminal')
+    const input = $<HTMLInputElement>('.term-input')!
+    fireEvent.change(input, { target: { value: 'help' } })
+    // A command that opens a window hands focus to it inside this dispatch,
+    // and the browser then aims Enter's default action at the new window.
+    // fireEvent returns false when preventDefault was called; jsdom performs
+    // no default action, so this is the only trace of the bug visible here.
+    // The symptom itself -- `basic <file>` losing the file it just loaded --
+    // needs a real browser.
+    expect(fireEvent.keyDown(input, { key: 'Enter' })).toBe(false)
+  })
+
   const run = async (command: string) => {
     const input = $<HTMLInputElement>('.term-input')!
     fireEvent.change(input, { target: { value: command } })
@@ -130,6 +144,40 @@ describe('Terminal', () => {
     await run('touch /boot/home/fromshell.txt')
     await waitFor(() => expect(useFs.getState().exists('/boot/home/fromshell.txt')).toBe(true))
     expect($$('.tracker-icon-label').map((n) => n.textContent)).toContain('fromshell.txt')
+  })
+
+  it('opens a program in BASIC with `basic <file>`', async () => {
+    render(<Desktop />)
+    await launch('Terminal')
+    const before = $$('.b-window').length
+    await run('basic basic/hello.bas')
+    await waitFor(() => expect($$('.b-window')).toHaveLength(before + 1))
+    expect($<HTMLTextAreaElement>('.basic-source')!.value).toContain('HELLO, WORLD')
+  })
+
+  it('creates the program when `basic <file>` names one that does not exist', async () => {
+    render(<Desktop />)
+    await launch('Terminal')
+    await run('basic fresh.bas')
+    await waitFor(() => expect(useFs.getState().exists('/boot/home/fresh.bas')).toBe(true))
+    expect($<HTMLTextAreaElement>('.basic-source')!.value).toBe('')
+  })
+
+  /**
+   * A directory has no `content`, so opening one loaded an empty listing and
+   * the first save wrote the program text onto the directory node itself --
+   * `/boot/home` came back as a dir carrying source. Both openers guard it.
+   */
+  it('refuses to open a directory as a file', async () => {
+    render(<Desktop />)
+    await launch('Terminal')
+    const before = $$('.b-window').length
+    await run('basic /boot/home')
+    expect(lastLine()).toContain('is a directory')
+    await run('edit /boot/home')
+    expect(lastLine()).toContain('is a directory')
+    expect($$('.b-window')).toHaveLength(before)
+    expect(useFs.getState().nodes['/boot/home'].content).toBeUndefined()
   })
 
   it('recalls history with the up arrow', async () => {
@@ -231,6 +279,28 @@ describe('save panel', () => {
     expect(titles()).toContain('fresh.txt')
   })
 
+  it('keeps the suggested name while browsing for a folder', async () => {
+    render(<Desktop />)
+    await launch('StyledEdit')
+    fireEvent.change($('.sedit-area')!, { target: { value: 'brand new' } })
+    await openSaveAs()
+
+    // Saving is not picking: the name is the caller's suggestion, and choosing
+    // a different folder for it must not throw it away.
+    fireEvent.click($<HTMLButtonElement>('.savepanel-up')!)
+    await waitFor(() => expect($('.savepanel-dir')?.textContent).toBe('/boot/home'))
+    expect($<HTMLInputElement>('#savepanel-name-field')!.value).toBe('Untitled.txt')
+
+    fireEvent.doubleClick(
+      $$<HTMLButtonElement>('.savepanel-row').find((r) => r.textContent === 'basic')!,
+    )
+    await waitFor(() => expect($('.savepanel-dir')?.textContent).toBe('/boot/home/basic'))
+    fireEvent.click(panelButton('Save'))
+
+    await waitFor(() => expect($('.savepanel')).toBeNull())
+    expect(useFs.getState().read('/boot/home/basic/Untitled.txt')).toBe('brand new')
+  })
+
   it('asks before replacing an existing file', async () => {
     render(<Desktop />)
     await launch('StyledEdit')
@@ -245,6 +315,113 @@ describe('save panel', () => {
     await waitFor(() => expect($('.b-alert')).toBeNull())
     expect($('.savepanel')).toBeTruthy()
     expect(useFs.getState().read('/boot/home/documents/tips.txt')).toContain('Keyboard')
+  })
+})
+
+describe('open panel', () => {
+  const openOpen = async () => {
+    fireEvent.pointerDown(byText('.sedit .b-menubar-item', 'File'), { button: 0 })
+    await waitFor(() => expect($('.b-menu')).toBeTruthy())
+    fireEvent.click(byText('.b-menu-item', 'Open'))
+  }
+  const panelRow = (name: string) =>
+    $$<HTMLButtonElement>('.savepanel-row').find((r) => r.textContent === name)!
+
+  it('lists a folder and loads the file that is picked', async () => {
+    render(<Desktop />)
+    await launch('StyledEdit')
+    await openOpen()
+    await waitFor(() => expect($('.savepanel')).toBeTruthy())
+
+    expect($('.savepanel-dir')?.textContent).toBe('/boot/home/documents')
+    expect($$('.savepanel-row-name').map((n) => n.textContent)).toContain('haiku.txt')
+
+    fireEvent.click(panelRow('haiku.txt'))
+    expect($<HTMLInputElement>('#savepanel-name-field')!.value).toBe('haiku.txt')
+    fireEvent.click(panelButton('Open'))
+
+    await waitFor(() => expect($('.savepanel')).toBeNull())
+    expect($<HTMLTextAreaElement>('.sedit-area')!.value).toBe(
+      useFs.getState().read('/boot/home/documents/haiku.txt'),
+    )
+    // The tab is retitled by an effect a commit later than the text lands.
+    await waitFor(() => expect(titles()).toContain('haiku.txt'))
+  })
+
+  it('finishes on a double-click, without a trip to the Open button', async () => {
+    render(<Desktop />)
+    await launch('StyledEdit')
+    await openOpen()
+    await waitFor(() => expect($('.savepanel')).toBeTruthy())
+
+    fireEvent.click(panelRow('tips.txt'))
+    fireEvent.doubleClick(panelRow('tips.txt'))
+    await waitFor(() => expect($('.savepanel')).toBeNull())
+    expect($<HTMLTextAreaElement>('.sedit-area')!.value).toContain('Keyboard')
+  })
+
+  it('refuses a name that is not there and stays open', async () => {
+    render(<Desktop />)
+    await launch('StyledEdit')
+    await openOpen()
+    await waitFor(() => expect($('.savepanel')).toBeTruthy())
+
+    fireEvent.change($('#savepanel-name-field')!, { target: { value: 'nope.txt' } })
+    fireEvent.click(panelButton('Open'))
+
+    await waitFor(() => expect($('.b-alert-text')?.textContent).toContain('does not exist'))
+    fireEvent.click(alertButton('OK'))
+    await waitFor(() => expect($('.b-alert')).toBeNull())
+    expect($('.savepanel')).toBeTruthy()
+  })
+
+  it('walks up to the parent folder', async () => {
+    render(<Desktop />)
+    await launch('StyledEdit')
+    await openOpen()
+    await waitFor(() => expect($('.savepanel')).toBeTruthy())
+
+    fireEvent.click($<HTMLButtonElement>('.savepanel-up')!)
+    await waitFor(() => expect($('.savepanel-dir')?.textContent).toBe('/boot/home'))
+    expect($$('.savepanel-row-name').map((n) => n.textContent)).toContain('readme.txt')
+  })
+
+  it('drops a picked name when it navigates away from its folder', async () => {
+    render(<Desktop />)
+    await launch('StyledEdit')
+    await openOpen()
+    await waitFor(() => expect($('.savepanel')).toBeTruthy())
+
+    fireEvent.click(panelRow('haiku.txt'))
+    expect($<HTMLInputElement>('#savepanel-name-field')!.value).toBe('haiku.txt')
+
+    // Going up would otherwise leave Open armed with a name that only exists
+    // in the folder just left -- "haiku.txt does not exist".
+    fireEvent.click($<HTMLButtonElement>('.savepanel-up')!)
+    await waitFor(() => expect($('.savepanel-dir')?.textContent).toBe('/boot/home'))
+    expect($<HTMLInputElement>('#savepanel-name-field')!.value).toBe('')
+    expect(panelButton('Open').disabled).toBe(true)
+
+    // And the same on the way down, through a folder's double-click.
+    fireEvent.click(panelRow('readme.txt'))
+    fireEvent.doubleClick(panelRow('basic'))
+    await waitFor(() => expect($('.savepanel-dir')?.textContent).toBe('/boot/home/basic'))
+    expect($<HTMLInputElement>('#savepanel-name-field')!.value).toBe('')
+    expect(panelButton('Open').disabled).toBe(true)
+  })
+
+  it('asks about unsaved work before it opens anything', async () => {
+    render(<Desktop />)
+    await launch('StyledEdit')
+    fireEvent.change($('.sedit-area')!, { target: { value: 'in progress' } })
+    await openOpen()
+
+    await waitFor(() => expect($('.b-alert-text')?.textContent).toContain('Save changes'))
+    fireEvent.click(alertButton('Cancel'))
+    await waitFor(() => expect($('.b-alert')).toBeNull())
+    // Cancelling the prompt cancels the open: no panel, nothing lost.
+    expect($('.savepanel')).toBeNull()
+    expect($<HTMLTextAreaElement>('.sedit-area')!.value).toBe('in progress')
   })
 })
 

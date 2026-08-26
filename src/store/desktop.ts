@@ -66,6 +66,8 @@ interface DesktopStore {
 
   /** Open a save panel; resolves with the chosen path, or null on cancel. */
   showSavePanel: (title: string, directory: string, name: string) => Promise<string | null>
+  /** Open an open panel; resolves with an existing file's path, or null on cancel. */
+  showOpenPanel: (title: string, directory: string) => Promise<string | null>
   dismissSavePanel: (id: string, path: string | null) => void
 
   /** Ask for an API key; resolves with the key, or null on cancel. */
@@ -242,7 +244,19 @@ export const useDesktop = create<DesktopStore>((set, get) => ({
   showSavePanel: (title, directory, name) =>
     new Promise<string | null>((resolve) => {
       const id = uid('save')
-      set((s) => ({ savePanels: [...s.savePanels, { id, title, directory, name, resolve }] }))
+      set((s) => ({
+        savePanels: [...s.savePanels, { id, mode: 'save', title, directory, name, resolve }],
+      }))
+    }),
+
+  // Shares the queue -- and the panel -- with save. Only the confirm rule and
+  // the button labels differ, and a file browser is a file browser.
+  showOpenPanel: (title, directory) =>
+    new Promise<string | null>((resolve) => {
+      const id = uid('open')
+      set((s) => ({
+        savePanels: [...s.savePanels, { id, mode: 'open', title, directory, name: '', resolve }],
+      }))
     }),
 
   dismissSavePanel: (id, path) => {
