@@ -211,3 +211,19 @@ export function ScreenIcon({ size = 32, className }: IconProps) {
     </svg>
   )
 }
+
+/** A control plate with two sliders -- R5 kept its settings on panels like this. */
+export function PrefsIcon({ size = 32, className }: IconProps) {
+  return (
+    <svg {...box(size)} className={className}>
+      <rect x="3" y="4" width="26" height="24" rx="2" fill="#c9ced6" stroke="#3a4049" strokeWidth="1.5" />
+      <path d="M3 10h26" stroke="#3a4049" strokeWidth="1.5" />
+      <path d="M4.5 5.5h9v3h-9z" fill="#ffc900" stroke="#8a6c00" strokeWidth="1.2" />
+      <g stroke="#8d96a3" strokeWidth="1.5" strokeLinecap="round">
+        <path d="M7 16h18M7 23h18" />
+      </g>
+      <rect x="10" y="13" width="4.5" height="6" rx="1" fill="#e6eaf0" stroke="#3a4049" strokeWidth="1.3" />
+      <rect x="18" y="20" width="4.5" height="6" rx="1" fill="#e6eaf0" stroke="#3a4049" strokeWidth="1.3" />
+    </svg>
+  )
+}

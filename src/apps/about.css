@@ -25,7 +25,7 @@
 .about-sub {
   margin: 2px 0 0;
   font-size: var(--fs-small);
-  color: var(--panel-darken-4);
+  color: var(--panel-text-dim);
 }
 
 .about-specs {
@@ -40,14 +40,14 @@
     inset var(--hairline) var(--hairline) 0 0 var(--panel-darken-3),
     inset calc(-1 * var(--hairline)) calc(-1 * var(--hairline)) 0 0 var(--panel-lighten-max);
 }
-.about-specs dt { color: var(--panel-darken-4); }
+.about-specs dt { color: var(--panel-text-dim); }
 .about-specs dd { margin: 0; }
 
 .about-credit {
   margin: 0;
   font-size: var(--fs-small);
   line-height: 14px;
-  color: var(--panel-darken-4);
+  color: var(--panel-text-dim);
 }
 
 .about-buttons {

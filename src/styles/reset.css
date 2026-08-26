@@ -12,7 +12,7 @@ body {
   font-family: var(--font-plain);
   font-size: var(--fs-plain);
   line-height: var(--lh-plain);
-  color: #000;
+  color: var(--panel-text);
   background: var(--desktop);
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
@@ -30,7 +30,7 @@ button, input, textarea, select {
 /* Only real document surfaces are selectable. */
 .selectable, input, textarea { user-select: text; }
 
-::selection { background: var(--text-selection); color: #000; }
+::selection { background: var(--text-selection); color: var(--document-text); }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {

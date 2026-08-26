@@ -7,6 +7,7 @@ import { Alerts } from './Alerts'
 import { SavePanel } from './SavePanel'
 import { KeyPanel } from './KeyPanel'
 import { Shutdown } from './Shutdown'
+import { ThemeCurtain } from './ThemeCurtain'
 import { useShortcuts } from './useShortcuts'
 
 export function Desktop() {
@@ -33,6 +34,9 @@ export function Desktop() {
       <KeyPanel />
       <Shutdown />
       <Alerts />
+      {/* Renders nothing until the theme changes, and portals to document.body
+          when it does -- position in this list is immaterial. */}
+      <ThemeCurtain />
     </div>
   )
 }

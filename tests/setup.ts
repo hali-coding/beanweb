@@ -49,7 +49,10 @@ beforeEach(() => {
     shutdown: null,
   })
   useFs.getState().reset()
-  useSettings.setState({ apiKey: '', model: DEFAULT_MODEL })
+  // Explicit literal, not a reset() action: a new persisted field keeps its
+  // previous value across tests until it is added here.
+  useSettings.setState({ apiKey: '', model: DEFAULT_MODEL, theme: 'light' })
+  document.documentElement.removeAttribute('data-theme')
 })
 
 afterEach(() => {

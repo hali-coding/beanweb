@@ -36,11 +36,15 @@
   font-family: var(--code-font);
   font-size: var(--code-size);
   line-height: var(--code-line);
-  color: var(--panel-darken-3);
+  color: var(--panel-text-faint);
   background: var(--panel-lighten-2);
   box-shadow: inset calc(-1 * var(--hairline)) 0 0 0 var(--panel-darken-2);
   user-select: none;
 }
+/* The gutter is a shade *off* the page, not a fixed grey. In light mode
+   --panel-lighten-2 sits just under white; against the dark page it lands far
+   too bright to read dim line numbers on, so dark steps the other way. */
+:root[data-theme="dark"] .basic-gutter { background: var(--panel-darken-1); }
 
 .basic-source {
   flex: 1 1 auto;
@@ -72,7 +76,7 @@
 }
 .basic-state {
   font-size: var(--fs-small);
-  color: var(--panel-darken-4);
+  color: var(--panel-text-dim);
 }
 
 /* ----------------------------------------------------------- console */

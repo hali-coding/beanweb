@@ -7,13 +7,30 @@
       name="viewport"
       content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no"
     />
-    <meta name="color-scheme" content="light" />
+    <meta name="color-scheme" content="light dark" />
     <meta name="theme-color" content="#336698" />
     <meta
       name="description"
       content="BeanWeb - a BeOS R5 tribute desktop that runs entirely in the browser."
     />
     <title>BeanWeb</title>
+    <!--
+      Stamp the theme before the first paint. React would apply it a frame or
+      two later, and a user who chose dark would watch the light desktop flash
+      past on every reload. The only place the storage key is duplicated --
+      it belongs to store/settings.ts, and the attribute to lib/theme.ts.
+    -->
+    <script>
+      try {
+        var s = JSON.parse(localStorage.getItem('beanweb.settings.v1') || '{}')
+        document.documentElement.setAttribute('data-theme', s.theme === 'dark' ? 'dark' : 'light')
+        if (s.theme === 'dark') {
+          document.querySelector('meta[name="theme-color"]').setAttribute('content', '#1f3e5c')
+        }
+      } catch (e) {
+        /* Private mode or a corrupt record: the light default already applies. */
+      }
+    </script>
   </head>
   <body>
     <div id="root"></div>

@@ -126,7 +126,7 @@
     inset calc(-1 * var(--hairline)) calc(-1 * var(--hairline)) 0 0 var(--panel-darken-3),
     inset calc(2 * var(--hairline)) calc(2 * var(--hairline)) 0 0 var(--panel-lighten-1),
     inset calc(-2 * var(--hairline)) calc(-2 * var(--hairline)) 0 0 var(--panel-darken-2),
-    3px 3px 0 0 rgba(0, 0, 0, 0.20);
+    3px 3px 0 0 var(--shadow-cast-soft);
 }
 .b-window--active .b-window-frame {
   box-shadow:
@@ -134,7 +134,7 @@
     inset calc(-1 * var(--hairline)) calc(-1 * var(--hairline)) 0 0 var(--panel-darken-3),
     inset calc(2 * var(--hairline)) calc(2 * var(--hairline)) 0 0 var(--panel-lighten-1),
     inset calc(-2 * var(--hairline)) calc(-2 * var(--hairline)) 0 0 var(--panel-darken-2),
-    4px 4px 0 0 rgba(0, 0, 0, 0.28);
+    4px 4px 0 0 var(--shadow-cast);
 }
 
 .b-window-content {
