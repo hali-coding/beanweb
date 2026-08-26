@@ -11,7 +11,7 @@ npm run dev        # Vite dev server with HMR
 npm run build      # tsc -b && vite build  -> dist/
 npm run preview    # serve the production build
 npm run typecheck  # types only
-npm test           # vitest run  (296 tests)
+npm test           # vitest run  (306 tests)
 npm run test:watch # vitest, watch mode
 ```
 
@@ -63,7 +63,8 @@ src/
   wm/         BWindow, WindowLayer, useWindowGesture, useViewport
   widgets/    controls.tsx (Button, CheckBox, …), Menu.tsx (MenuBar + MenuPanel)
   apps/       registry.ts + one file per app + index.ts
-  shell/      Desktop, Deskbar, DesktopIcons, Alerts, SavePanel, useShortcuts
+  shell/      Desktop, Deskbar, DesktopIcons, Alerts, SavePanel, Shutdown,
+              useShortcuts
 tests/        vitest + jsdom; setup.ts resets the stores between tests
 ```
 
@@ -102,6 +103,34 @@ would only cover one of the three. `closeWindow` is the unguarded escape hatch
 and should stay that way. Guards live in a module-level Map (`lib/closeGuards`)
 rather than the store because they are functions nothing renders, and are read
 through a ref so they never see a stale `dirty` flag.
+
+## Shut Down
+
+The Be menu ends with *Restart* and *Shut Down*, and both run one sequence:
+confirm, quit every window front-most first, then park. Shut Down parks on a
+window that says it is now safe to turn off your browser tab, with a **Reboot
+System** button that Enter also triggers — R5's final dialog, which is where the
+wording comes from. Restart skips the parked window and boots straight back up.
+
+- **The sequence closes windows with `requestClose`, never `closeWindow`**, so
+  an app holding unsaved work gets the same prompt its close box would give it.
+  If the guard says no, the whole shutdown is abandoned rather than the window
+  killed — what R5 did when an application refused to quit. This is the reason
+  `--z-shutdown` (9850) sits *below* `--z-alert` (9900): the guard's prompt has
+  to paint on top of the shutdown screen, not behind it.
+- **The store is synchronous; the view paces it.** `beginShutdown` sets the
+  state and `quitNext()` quits exactly one window, so a test can step the
+  sequence a window at a time with no timers. Only `shell/Shutdown.tsx` owns the
+  interval that calls it. `quitNext` keeps a module-level re-entry guard because
+  the interval keeps ticking while one step is awaiting a close guard's alert.
+- **The window is a replica, not a managed window.** It has no entry in the
+  store, no drag, resize or close box, and it has to survive the store being
+  emptied around it. It reuses the real `.b-window-*` classes so its tab and
+  bevels cannot drift from every other window; only the R5-bold tab title and
+  the static centred position are its own.
+- `reboot()` clears windows, alerts and panels but **not** `fs` — a reboot keeps
+  the disk. Relaunching the boot Tracker is left to the component, because
+  `registry.ts` imports the store and the store must not import it back.
 
 ## BASIC graphics and the screen window
 

@@ -7,6 +7,8 @@ import type {
   Rect,
   KeyPromptState,
   SavePanelState,
+  ShutdownMode,
+  ShutdownState,
   WindowId,
 } from '@/lib/types'
 
@@ -23,6 +25,8 @@ let nextZ = 100
 let seq = 0
 /** Windows with a close prompt already on screen. */
 const closing = new Set<WindowId>()
+/** Guards quitNext(): the view polls it on an interval, and a step awaits. */
+let quitting = false
 const uid = (prefix: string) => `${prefix}-${++seq}-${Date.now().toString(36)}`
 
 export interface OpenOptions {
@@ -43,6 +47,8 @@ interface DesktopStore {
   alerts: AlertState[]
   savePanels: SavePanelState[]
   keyPrompts: KeyPromptState[]
+  /** Non-null once Shut Down or Restart is under way. */
+  shutdown: ShutdownState | null
 
   openWindow: (opts: OpenOptions) => WindowId
   /** Ask the window's close guard first; use this for anything user-initiated. */
@@ -70,6 +76,16 @@ interface DesktopStore {
   showOpenPanel: (title: string, directory: string) => Promise<string | null>
   dismissSavePanel: (id: string, path: string | null) => void
 
+  /**
+   * Be menu -> Shut Down / Restart. Resolves false if the user backed out at
+   * the confirmation. Quitting itself is stepped by quitNext().
+   */
+  beginShutdown: (mode: ShutdownMode) => Promise<boolean>
+  /** Ask the front-most window to quit. One window per call so the view paces it. */
+  quitNext: () => Promise<void>
+  /** "Reboot System": wipe the session. The virtual disk survives, as a disk does. */
+  reboot: () => void
+
   /** Ask for an API key; resolves with the key, or null on cancel. */
   showKeyPrompt: (current: string) => Promise<string | null>
   dismissKeyPrompt: (id: string, key: string | null) => void
@@ -90,6 +106,7 @@ export const useDesktop = create<DesktopStore>((set, get) => ({
   alerts: [],
   savePanels: [],
   keyPrompts: [],
+  shutdown: null,
 
   openWindow: (opts) => {
     if (opts.singleton) {
@@ -265,6 +282,91 @@ export const useDesktop = create<DesktopStore>((set, get) => ({
     panel?.resolve(path)
   },
 
+  beginShutdown: async (mode) => {
+    if (get().shutdown) return false
+    const label = mode === 'restart' ? 'Restart' : 'Shut Down'
+    const open = get().order.length
+
+    // R5 only stopped to ask when something was still running; an empty desktop
+    // goes straight down.
+    if (open > 0) {
+      const answer = await get().showAlert(
+        'warn',
+        label,
+        `${open} window${open === 1 ? '' : 's'} still open.\n\n` +
+          'Every application will be asked to quit. One holding unsaved work\n' +
+          'gets a chance to stop this.',
+        ['Cancel', label],
+        0,
+      )
+      if (answer !== 1) return false
+      // A second Shut Down could have started while the alert was up.
+      if (get().shutdown) return false
+    }
+
+    set({
+      shutdown: { mode, phase: get().order.length ? 'quitting' : 'down', quitting: null },
+    })
+    return true
+  },
+
+  quitNext: async () => {
+    // The view polls this on an interval while one step awaits a close guard's
+    // alert, so without the guard a slow answer would be asked for twice.
+    if (quitting) return
+    const s = get()
+    const sd = s.shutdown
+    if (!sd || sd.phase !== 'quitting') return
+
+    // Front-most first, the order you would close them by hand.
+    const front = s.order
+      .map((id) => s.windows[id])
+      .filter(Boolean)
+      .sort((a, b) => a.z - b.z)
+      .pop()
+
+    if (!front) {
+      set({ shutdown: { ...sd, phase: 'down', quitting: null } })
+      return
+    }
+
+    quitting = true
+    try {
+      set({ shutdown: { ...sd, quitting: front.title } })
+      // requestClose, never closeWindow: an app with unsaved work must get the
+      // same prompt the close box would give it.
+      await get().requestClose(front.id)
+    } finally {
+      quitting = false
+    }
+
+    // Still there means its close guard said no. R5 abandoned the shutdown when
+    // an application refused to quit, and so does this.
+    if (get().windows[front.id]) {
+      set({ shutdown: null })
+      return
+    }
+
+    const after = get()
+    if (after.shutdown && after.order.length === 0) {
+      set({ shutdown: { ...after.shutdown, phase: 'down', quitting: null } })
+    }
+  },
+
+  reboot: () => {
+    closing.clear()
+    quitting = false
+    set({
+      windows: {},
+      order: [],
+      activeId: null,
+      alerts: [],
+      savePanels: [],
+      keyPrompts: [],
+      shutdown: null,
+    })
+  },
+
   showKeyPrompt: (current) =>
     new Promise<string | null>((resolve) => {
       const id = uid('key')
@@ -288,6 +390,7 @@ export const selectActiveId = (s: DesktopStore) => s.activeId
 export const selectAlerts = (s: DesktopStore) => s.alerts
 export const selectSavePanels = (s: DesktopStore) => s.savePanels
 export const selectKeyPrompts = (s: DesktopStore) => s.keyPrompts
+export const selectShutdown = (s: DesktopStore) => s.shutdown
 
 /** Imperative handles for code outside React (menus, app internals). */
 export const desktop = {

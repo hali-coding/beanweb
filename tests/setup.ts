@@ -46,6 +46,7 @@ beforeEach(() => {
     alerts: [],
     savePanels: [],
     keyPrompts: [],
+    shutdown: null,
   })
   useFs.getState().reset()
   useSettings.setState({ apiKey: '', model: DEFAULT_MODEL })

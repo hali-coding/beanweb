@@ -399,3 +399,64 @@
   justify-content: flex-end;
   gap: 8px;
 }
+
+/* ---------------------------------------------------------------- Shut Down
+   A replica of the window chrome rather than a managed window: no store entry,
+   no drag, no close box. It reuses the real .b-window-* classes so the tab and
+   bevels can never drift from every other window on the desktop. */
+.b-shutdown {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-shutdown);
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  /* Not dead centre: the extra bottom padding shortens the box the grid centres
+     in, which lands the dialog's middle a third of the way down the screen. */
+  padding-bottom: calc(16px + 33.33vh);
+  background: var(--desktop);
+}
+/* Centred by the grid above, so it must take neither .b-window's absolute
+   positioning nor the transform a drag would have left on it. */
+.b-shutdown-window {
+  position: static;
+  width: min(420px, 100%);
+  will-change: auto;
+}
+.b-shutdown .b-window-title { font-weight: 700; }
+
+.b-shutdown-body {
+  display: flex;
+  /* Content-sized on the desktop, but below 768px wm.css forces the window to
+     fill the screen, and a min-height alone would leave a dead grey field under
+     the text with the gutter stopping short. Grow into whatever height we get. */
+  flex: 1 1 auto;
+  min-height: 132px;
+  background: var(--panel);
+}
+/* R5 alerts keep a blank column where the icon would sit. */
+.b-shutdown-gutter {
+  width: 30px;
+  flex: none;
+  background: var(--panel-darken-1);
+}
+.b-shutdown-main {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  padding: 16px 18px;
+  text-align: center;
+}
+.b-shutdown-text {
+  margin: 0;
+  font-size: var(--fs-plain);
+  line-height: 16px;
+}
+.b-shutdown-buttons { display: flex; }
+
+@media (max-width: 767px) {
+  .b-shutdown { padding-bottom: 16px; }
+}

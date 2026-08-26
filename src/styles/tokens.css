@@ -76,6 +76,9 @@
   --z-windows: 100;
   --z-deskbar: 9500;
   --z-menu: 9800;
+  /* Shut Down sits below alerts on purpose: while it is quitting windows, an
+     app's close guard still has to be able to put its prompt on top of it. */
+  --z-shutdown: 9850;
   --z-alert: 9900;
 }
 
