@@ -58,7 +58,8 @@ src/
   main.tsx    entry: CSS in cascade order, then `import './apps'`, then render
   styles/     tokens.css (R5 palette) + reset, widgets, wm, shell
   lib/        types.ts, icons.tsx (original 32-unit-grid SVGs), theme.ts,
-              disk.ts (the shared reset-disk confirmation)
+              disk.ts (the shared reset-disk confirmation),
+              transfer.ts (import/export between the host and the disk)
   store/      desktop.ts (windows, focus, modals), fs.ts (virtual FS),
               settings.ts (API key, model, theme)
   wm/         BWindow, WindowLayer, useWindowGesture, useViewport

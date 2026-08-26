@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useMemo, useRef, useState } from 'react'
 import { MenuBar } from '@/widgets/Menu'
 import type { MenuDef } from '@/widgets/Menu'
 import { ScrollView } from '@/widgets/controls'
@@ -6,6 +6,7 @@ import { FolderIcon, TextFileIcon, AppIcon, TrackerIcon } from '@/lib/icons'
 import type { FsNode } from '@/store/fs'
 import { basename, dirname, joinPath, useFs } from '@/store/fs'
 import { useDesktop } from '@/store/desktop'
+import { exportNode, importFiles, importFromHost } from '@/lib/transfer'
 import { getApp, launchApp, registerApp } from './registry'
 import type { AppProps } from './registry'
 import './tracker.css'
@@ -41,6 +42,11 @@ export function Tracker({ windowId, args }: AppProps) {
   const [path, setPath] = useState(args?.path ?? '/boot/home')
   const [mode, setMode] = useState<ViewMode>('icon')
   const [selected, setSelected] = useState<string | null>(null)
+  const [dropping, setDropping] = useState(false)
+
+  // `dragleave` fires every time the pointer crosses into a child, so a plain
+  // boolean flickers off mid-drag. Count enters against leaves instead.
+  const dragDepth = useRef(0)
 
   const setTitle = useDesktop((s) => s.setTitle)
   const showAlert = useDesktop((s) => s.showAlert)
@@ -106,7 +112,38 @@ export function Tracker({ windowId, args }: AppProps) {
     }
   }, [nodes, remove, selected, showAlert])
 
+  const onDragEnter = useCallback((e: React.DragEvent) => {
+    if (!e.dataTransfer.types.includes('Files')) return
+    e.preventDefault()
+    dragDepth.current += 1
+    setDropping(true)
+  }, [])
+
+  const onDragOver = useCallback((e: React.DragEvent) => {
+    if (!e.dataTransfer.types.includes('Files')) return
+    // Both of these are required, or the drop never fires at all.
+    e.preventDefault()
+    e.dataTransfer.dropEffect = 'copy'
+  }, [])
+
+  const onDragLeave = useCallback(() => {
+    dragDepth.current = Math.max(0, dragDepth.current - 1)
+    if (dragDepth.current === 0) setDropping(false)
+  }, [])
+
+  const onDrop = useCallback(
+    (e: React.DragEvent) => {
+      if (!e.dataTransfer.types.includes('Files')) return
+      e.preventDefault()
+      dragDepth.current = 0
+      setDropping(false)
+      void importFiles([...e.dataTransfer.files], path)
+    },
+    [path],
+  )
+
   const atRoot = path === '/'
+  const exportable = Boolean(selected && nodes[selected]?.kind === 'text')
 
   const menus: MenuDef[] = useMemo(
     () => [
@@ -121,6 +158,13 @@ export function Tracker({ windowId, args }: AppProps) {
             onSelect: () => selected && nodes[selected] && openNode(nodes[selected]),
           },
           { label: 'Move to Trash', disabled: !selected, onSelect: deleteSelected },
+          { separator: true },
+          { label: 'Import…', onSelect: () => void importFromHost(path) },
+          {
+            label: 'Export…',
+            disabled: !exportable,
+            onSelect: () => selected && exportNode(selected),
+          },
           { separator: true },
           { label: 'Close', shortcut: 'Alt+W', onSelect: () => void requestClose(windowId) },
         ],
@@ -145,11 +189,18 @@ export function Tracker({ windowId, args }: AppProps) {
         ],
       },
     ],
-    [atRoot, requestClose, deleteSelected, mode, navigate, newFolder, nodes, openNode, path, selected, windowId],
+    [atRoot, requestClose, deleteSelected, exportable, mode, navigate, newFolder, nodes, openNode, path, selected, windowId],
   )
 
   return (
-    <div className="tracker">
+    <div
+      className="tracker"
+      data-drop={dropping}
+      onDragEnter={onDragEnter}
+      onDragOver={onDragOver}
+      onDragLeave={onDragLeave}
+      onDrop={onDrop}
+    >
       <MenuBar menus={menus} />
 
       <div className="tracker-locbar">

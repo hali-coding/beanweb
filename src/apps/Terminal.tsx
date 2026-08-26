@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { TerminalIcon } from '@/lib/icons'
 import { basename, dirname, resolvePath, useFs } from '@/store/fs'
 import { useDesktop } from '@/store/desktop'
+import { exportNode, importFromHost } from '@/lib/transfer'
 import { launchApp, listApps, registerApp } from './registry'
 import type { AppProps } from './registry'
 import './terminal.css'
@@ -89,6 +90,8 @@ export function Terminal({ windowId, args }: AppProps) {
               'mkdir <dir>     create a directory',
               'touch <file>    create an empty file',
               'rm <path>       remove a file or directory',
+              'import          bring files in from your computer',
+              'export <file>   save a file to your computer',
               'echo <text>     print text',
               'tree            show the tree below here',
               'apps            list installed applications',
@@ -184,6 +187,26 @@ export function Terminal({ windowId, args }: AppProps) {
           if (!arg) return emit('rm: missing operand', 'err')
           const target = resolvePath(cwd, arg)
           if (!state.remove(target)) return emit(`rm: ${arg}: no such file or directory`, 'err')
+          break
+        }
+
+        case 'import': {
+          // Dispatched straight from the Enter keypress, so the picker still
+          // counts as user-activated by the time it opens.
+          void importFromHost(cwd).then((paths) => {
+            emit(paths.length ? paths.map(basename).join('\n') : 'import: nothing imported')
+          })
+          break
+        }
+
+        case 'export': {
+          if (!arg) return emit('export: missing operand', 'err')
+          const target = resolvePath(cwd, arg)
+          const node = state.nodes[target]
+          if (!node) return emit(`export: ${arg}: no such file or directory`, 'err')
+          if (node.kind === 'dir') return emit(`export: ${arg}: is a directory`, 'err')
+          if (!exportNode(target)) return emit(`export: ${arg}: not a document`, 'err')
+          emit(`saved ${node.name} to your computer`)
           break
         }
 
