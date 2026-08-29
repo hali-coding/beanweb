@@ -164,6 +164,12 @@ input:focus-visible + .b-radio-dot { outline: calc(2 * var(--hairline)) solid va
   padding: 2px;
   background: var(--panel);
   z-index: var(--z-menu);
+  /* MenuPanel nudges a panel back on-screen but cannot shrink one that is
+     taller than the screen. Bean Challenge's Level menu has thirty items and
+     Claude's model list grows with the catalogue, so the ceiling lives here
+     rather than in either app. */
+  max-height: calc(100vh - 8px);
+  overflow-y: auto;
   box-shadow:
     inset var(--hairline) var(--hairline) 0 0 var(--panel-lighten-max),
     inset calc(-1 * var(--hairline)) calc(-1 * var(--hairline)) 0 0 var(--panel-darken-3),

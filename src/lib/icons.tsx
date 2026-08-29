@@ -170,6 +170,36 @@ export function TetrisIcon({ size = 32, className }: IconProps) {
   )
 }
 
+/** A tiled floor with a bean on it and a key beside it -- the game in one square. */
+export function BeanChallengeIcon({ size = 32, className }: IconProps) {
+  return (
+    <svg {...box(size)} className={className}>
+      <rect x="3" y="4" width="26" height="24" rx="2" fill="#5d6d80" stroke="#232a34" strokeWidth="1.5" />
+      <g fill="#546375">
+        <rect x="3.8" y="4.8" width="8" height="7.5" />
+        <rect x="20" y="4.8" width="8" height="7.5" />
+        <rect x="11.8" y="12.3" width="8.2" height="7.5" />
+        <rect x="3.8" y="19.8" width="8" height="7.4" />
+        <rect x="20" y="19.8" width="8" height="7.4" />
+      </g>
+      {/* The same kidney bean the board draws, at icon scale. */}
+      <path
+        d="M11 9.5 20 8.5l3.5 4.5-2 7-6 2-5-3.5z"
+        fill="#8fbf4a"
+        stroke="#3f6b12"
+        strokeWidth="1.4"
+        strokeLinejoin="round"
+      />
+      <path d="M13.5 11.5 18 11l1.5 2.2-3 .6z" fill="#d4f090" />
+      <g stroke="#8a2b24" strokeWidth="1.2">
+        <circle cx="9" cy="22" r="3" fill="#d8453c" />
+        <path d="M11.5 23.5h7v2h-7z" fill="#d8453c" />
+      </g>
+      <circle cx="9" cy="22" r="1" fill="#3a2020" />
+    </svg>
+  )
+}
+
 /** Anthropic-flavoured burst mark, drawn fresh on the 32-unit grid. */
 export function ClaudeIcon({ size = 32, className }: IconProps) {
   return (

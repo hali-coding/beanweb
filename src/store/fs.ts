@@ -183,6 +183,8 @@ function seed(): Record<string, FsNode> {
     dir('/boot/home/config'),
     dir('/boot/home/documents'),
     dir('/boot/home/basic'),
+    // Empty until the level editor lands; `.bcl` files are what it will write.
+    dir('/boot/home/beanchallenge'),
     dir('/boot/apps'),
     dir('/boot/system'),
 
@@ -207,6 +209,7 @@ function seed(): Record<string, FsNode> {
     app('/boot/apps/Terminal', 'terminal'),
     app('/boot/apps/StyledEdit', 'styledit'),
     app('/boot/apps/Tetris', 'tetris'),
+    app('/boot/apps/BeanChallenge', 'beanchallenge'),
     app('/boot/apps/BASIC', 'basic'),
     app('/boot/apps/Claude', 'claude'),
   ]
