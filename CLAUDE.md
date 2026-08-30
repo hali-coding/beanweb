@@ -11,7 +11,7 @@ npm run dev        # Vite dev server with HMR
 npm run build      # tsc -b && vite build  -> dist/
 npm run preview    # serve the production build
 npm run typecheck  # types only
-npm test           # vitest run  (325 tests)
+npm test           # vitest run  (395 tests)
 npm run test:watch # vitest, watch mode
 ```
 
@@ -59,7 +59,8 @@ src/
   styles/     tokens.css (R5 palette) + reset, widgets, wm, shell
   lib/        types.ts, icons.tsx (original 32-unit-grid SVGs), theme.ts,
               disk.ts (the shared reset-disk confirmation),
-              transfer.ts (import/export between the host and the disk)
+              transfer.ts (import/export between the host and the disk),
+              basic/ (the BASIC engine), beanchallenge/ (the game's rules)
   store/      desktop.ts (windows, focus, modals), fs.ts (virtual FS),
               settings.ts (API key, model, theme)
   wm/         BWindow, WindowLayer, useWindowGesture, useViewport
@@ -225,6 +226,77 @@ The window chrome, focus, drag, resize and menu bar all come for free — an app
 renders only its own content into `.b-window-content`. If it holds unsaved
 state, add a `useCloseGuard`.
 
+Adding an app to `src/store/fs.ts`'s `seed()` as an `app()` node is what puts it
+in Tracker and in `ls /boot/apps`; `tests/shell.test.tsx` walks that folder.
+
+## Bean Challenge
+
+A tile puzzle in the spirit of *Chip's Challenge*: collect the beans, open the
+socket, reach the exit before the clock runs out. Thirty levels in
+`lib/beanchallenge/levels.ts`, and the folder is laid out so a **level editor**
+can be added later without moving anything.
+
+- **The rules are pure data with no DOM**, like `lib/basic/screen.ts`.
+  `step(game, input)` advances one tick and returns a new `Game`; the only timer
+  in the game is the interval in `apps/BeanChallenge.tsx`. Same division as Shut
+  Down and the theme curtain — the store is synchronous, the view paces it.
+- **`startLevel` takes a `Level`, never an index.** That one signature is what
+  will let an editor playtest a board it has not saved.
+- **Randomness is a seeded PRNG carried in `Game`**, not `Math.random`. Walkers
+  and random force floors are therefore reproducible, which is the whole basis
+  of the solution test below.
+- **A tick is 100 ms; the player moves on odd ticks and monsters on even ones**,
+  so both run at five squares a second and one recorded move is two ticks.
+- **React never re-renders per tick.** The live `Game` sits in a ref, the
+  interval advances it, and a `requestAnimationFrame` loop blits when `version`
+  moves. Only the panel's handful of numbers are mirrored into state. The
+  player's square is written straight onto the canvas element's dataset — it
+  changes nothing visible in the chrome, and it is the only way a jsdom test can
+  see the board at all.
+- **Every level ends `#.#############` over `#...........SE#`.** The socket has
+  to sit in the one square before the exit, at the end of a corridor with a
+  single mouth. Anything else lets the player drop into the bottom row past the
+  socket and walk out with the beans still on the floor — which is exactly what
+  a solver did to eight of these on its first run.
+- **Every level carries a recorded `solution`, and the suite replays all thirty.**
+  A rule change that makes one unwinnable fails in CI rather than in front of
+  someone on level 24. Most were found by a breadth-first search over `step`;
+  the walker level needed a greedy rollout, because a walker's turn depends on
+  the whole history of the seed and states that look alike are not.
+- **A block a level never has to move is scenery, and reads as a puzzle.** The
+  five block levels — 2, 4, 6, 8 and 10 — were each checked by freezing one
+  block into a wall and re-running the search: if the level is still winnable,
+  that block was decoration and the gate it stood in has a way around it. Every
+  block in those five is load-bearing, and `tests/beanchallenge.test.ts` keeps
+  the cheap half of the check by asserting the recorded run leaves none of them
+  on its starting square. `firewalk` and `block-party` still carry blocks that
+  fail this and are the obvious next levels to rework.
+- **Ice and blocks barely interact, and the levels are drawn accordingly.** A
+  block cannot be pushed while sliding, and sliding into one reverses you
+  without moving you, so a block on ice is only ever a bounce — never a way to
+  stop where you choose. `cold-comfort` and `skate-park` therefore gate their
+  slides with blocks standing on solid floor rather than trying to build a
+  puzzle out of the pair.
+- **`parseLevel` and `formatLevel` are exact inverses**, and `validateLevel` is
+  a function rather than a pile of assertions. Both exist for the editor: one is
+  how it will save, the other is the warning list it will show while you draw.
+  The suite is simply their first caller.
+- **Force floors must never form a closed loop, and ice must never form a ring.**
+  There is no override move, so a player who enters one never gets a turn back
+  and the level becomes unwinnable. `slip-road` is a spiral for this reason.
+- Deliberate simplifications, all so the board stays readable: monsters treat
+  water and fire as walls rather than dying in them (a bug that read water as
+  floor would drown on the first tick and empty the level), only the player
+  presses buttons, and blocks do not slide on ice or force floors.
+
+### Adding a level
+
+Append one object to `LEVELS` with a fresh `id`, a `map`, and a `solution` you
+have actually played. `id` is what progress is keyed by, so inserting or
+reordering levels never disturbs a save. The legend is one table in `tiles.ts`
+and both lookup directions are derived from it — add a tile there and the map
+character, the palette label and the round-trip all follow.
+
 ## Design system
 
 Greys are **derived, not picked**. R5 computes every shade from the panel colour
@@ -278,10 +350,11 @@ element**. Everything above them — metrics, the `--z-*` ladder, and
   panel gives primary text a ratio of 4.6 against light mode's 14.7. The three
   levels are chosen so each one's *ratio* matches its light counterpart; check
   with a contrast calculation rather than by eye before adding a fourth.
-- **Terminal, the BASIC console, the BASIC screen and Tetris are deliberately
-  not themed.** They are screens and a game, not chrome — emulated CGA/VGA
-  attributes, a phosphor palette, tetromino colours. So is `lib/icons.tsx`: R5
-  icons were full-colour artwork, and a page icon is white paper on any desktop.
+- **Terminal, the BASIC console, the BASIC screen, Tetris and Bean Challenge
+  are deliberately not themed.** They are screens and games, not chrome —
+  emulated CGA/VGA attributes, a phosphor palette, tetromino colours, a tile
+  set. So is `lib/icons.tsx`: R5 icons were full-colour artwork, and a page icon
+  is white paper on any desktop.
 - **The four scrollbar arrows are `data:` URIs.** `var()` cannot be interpolated
   inside `url()`, so the dark theme re-declares those four `background-image`
   rules. Note that a Chrome using overlay scrollbars ignores
@@ -424,3 +497,11 @@ because the project has no backend to proxy through.
 Replicants, the 3×3 Workspaces switcher, Pulse, DeskCalc, NetPositive, and media
 apps. Window stacking/tiling (dragging one tab onto another) is not implemented;
 tab *sliding* along the top edge is, via Shift-drag.
+
+**Bean Challenge's level editor.** Not built, but everything it needs is:
+`formatLevel` round-trips a board back to text, `formatLevelFile` /
+`parseLevelFile` give a level a form StyledEdit can already open (`.bcl`, in the
+empty `/boot/home/beanchallenge`), `validateLevel` is the warning list, `packs.ts`
+is where a user pack joins the built-in one, `drawTile` is the palette's artwork,
+and `replay` is the "verify solvable" button. It should be its own window, and it
+will need a `useCloseGuard` — it is the first thing here that holds unsaved work.

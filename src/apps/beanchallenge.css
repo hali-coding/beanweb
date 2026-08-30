@@ -1,0 +1,205 @@
+/*
+ * Bean Challenge.
+ *
+ * The board is deliberately not themed -- it is a play surface with its own
+ * palette, like Tetris's well, and every colour in it is drawn in
+ * `lib/beanchallenge/paint.ts` rather than declared here. Everything around the
+ * board is ordinary R5 chrome and uses the panel tokens.
+ */
+
+.bean {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  background: var(--panel);
+}
+
+.bean-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  gap: 8px;
+  padding: 6px;
+}
+
+/* The surround a monitor had around its picture. The frame inside is sized in
+   pixels by the app, because the board has to letterbox against both axes. */
+.bean-stage {
+  position: relative;
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  background: #161a20;
+  box-shadow:
+    inset var(--hairline) var(--hairline) 0 0 var(--panel-darken-3),
+    inset calc(-1 * var(--hairline)) calc(-1 * var(--hairline)) 0 0 var(--panel-lighten-max),
+    inset calc(2 * var(--hairline)) calc(2 * var(--hairline)) 0 0 var(--panel-darken-2),
+    inset calc(-2 * var(--hairline)) calc(-2 * var(--hairline)) 0 0 var(--panel-lighten-1);
+}
+
+.bean-frame {
+  display: flex;
+  /* Never let flex resize what the app measured. */
+  flex: none;
+  width: 100%;
+  height: 100%;
+}
+
+.bean-canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+  /* Tiles are drawn on a 32-unit grid; blown up they should stay crisp rather
+     than turning into a smear. */
+  image-rendering: pixelated;
+}
+
+.bean-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--scrim);
+}
+
+.bean-plaque {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  background: var(--panel);
+  color: var(--panel-text);
+  box-shadow:
+    inset var(--hairline) var(--hairline) 0 0 var(--panel-lighten-max),
+    inset calc(-1 * var(--hairline)) calc(-1 * var(--hairline)) 0 0 var(--panel-darken-3),
+    inset calc(2 * var(--hairline)) calc(2 * var(--hairline)) 0 0 var(--panel-lighten-1),
+    inset calc(-2 * var(--hairline)) calc(-2 * var(--hairline)) 0 0 var(--panel-darken-2);
+}
+
+.bean-plaque-text {
+  font-weight: bold;
+}
+
+.bean-side {
+  flex: none;
+  width: 124px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-height: 0;
+}
+
+.bean-box {
+  flex: none;
+}
+
+.bean-level {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.bean-level strong {
+  font-size: 16px;
+}
+
+.bean-level span {
+  font-size: var(--fs-small);
+  color: var(--panel-text-dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bean-stats {
+  flex: none;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 1px 8px;
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.bean-stats dt {
+  color: var(--panel-text-dim);
+}
+
+.bean-stats dd {
+  margin: 0;
+  text-align: right;
+}
+
+/* Keys over boots, drawn with the board's own tile art so there is one set of
+   pictures rather than two. */
+.bean-strip {
+  display: block;
+  width: 104px;
+  height: 52px;
+  image-rendering: pixelated;
+}
+
+.bean-buttons {
+  margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.bean-pad {
+  display: none;
+}
+
+.bean-status {
+  flex: none;
+  height: 17px;
+  padding: 0 6px 3px;
+  font-size: var(--fs-small);
+  color: var(--panel-text-dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 768px) {
+  .bean-body {
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .bean-side {
+    width: auto;
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .bean-buttons {
+    margin-top: 0;
+    flex-direction: row;
+  }
+}
+
+@media (pointer: coarse) {
+  .bean-pad {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 6px;
+    padding: 0 6px 6px;
+  }
+
+  .bean-pad .b-button {
+    height: 34px;
+    font-size: 16px;
+  }
+
+  .bean-status {
+    display: none;
+  }
+}
