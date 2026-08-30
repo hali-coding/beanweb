@@ -103,8 +103,16 @@ async function getPullFiles({ owner, repo, number, token }) {
 }
 
 async function getIssueComments({ owner, repo, issueNumber, token }) {
-  const url = `https://api.github.com/repos/${owner}/${repo}/issues/${issueNumber}/comments?per_page=100`
-  return ghFetchJson(url, token)
+  const comments = []
+  let page = 1
+  while (true) {
+    const url = `https://api.github.com/repos/${owner}/${repo}/issues/${issueNumber}/comments?per_page=100&page=${page}`
+    const chunk = await ghFetchJson(url, token)
+    comments.push(...chunk)
+    if (!Array.isArray(chunk) || chunk.length < 100) break
+    page += 1
+  }
+  return comments
 }
 
 function isAuthorized(permission) {
