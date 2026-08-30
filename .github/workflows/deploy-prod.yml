@@ -1,8 +1,6 @@
-name: Deploy to test
+name: Deploy to prod
 
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
 
 concurrency:
@@ -16,6 +14,6 @@ jobs:
   deploy:
     uses: ./.github/workflows/deploy-reusable.yml
     with:
-      environment_name: test
-      deploy_path: /var/www/beanweb-test/
+      environment_name: production
+      deploy_path: /var/www/beanweb/
     secrets: inherit

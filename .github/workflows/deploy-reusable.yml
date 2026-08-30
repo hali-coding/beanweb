@@ -1,0 +1,97 @@
+name: Deploy (reusable)
+
+on:
+  workflow_call:
+    inputs:
+      environment_name:
+        description: GitHub environment holding this target's SERVER_IP/SERVER_KEY secrets
+        required: true
+        type: string
+      remote_user:
+        description: SSH user on the remote server
+        required: false
+        type: string
+        default: github
+      deploy_path:
+        description: Remote directory to rsync dist/ into
+        required: true
+        type: string
+
+jobs:
+  deploy:
+    name: 🚀 Build and deploy
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: ${{ inputs.environment_name }}
+
+    env:
+      BLUE: '\033[1;34m'
+      MAGENTA: '\033[1;35m'
+      YELLOW: '\033[1;33m'
+      CYAN: '\033[1;36m'
+      GREEN: '\033[1;32m'
+      RESET: '\033[0m'
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: 📦 Install dependencies
+        run: |
+          echo -e "${BLUE}📦 Installing dependencies...${RESET}"
+          npm config set audit false
+          npm config set fund false
+          npm ci
+
+      - name: 🔨 Build
+        run: |
+          echo -e "${MAGENTA}🔨 Building the app...${RESET}"
+          npm run build
+          echo -e "${GREEN}✅ Build complete!${RESET}"
+
+      - name: 🔐 Configure SSH
+        env:
+          SERVER_KEY: ${{ secrets.SERVER_KEY }}
+          SERVER_IP: ${{ secrets.SERVER_IP }}
+        run: |
+          echo -e "${YELLOW}🔐 Setting up SSH access...${RESET}"
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "$SERVER_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H "$SERVER_IP" >> ~/.ssh/known_hosts
+          echo -e "${GREEN}✅ SSH ready!${RESET}"
+
+      - name: 📤 Upload build output
+        env:
+          SERVER_IP: ${{ secrets.SERVER_IP }}
+          REMOTE_USER: ${{ inputs.remote_user }}
+          DEPLOY_PATH: ${{ inputs.deploy_path }}
+        run: |
+          echo -e "${CYAN}📤 Uploading dist/ to ${SERVER_IP}:${DEPLOY_PATH}...${RESET}"
+          rsync -avz --delete \
+            -e "ssh -i ~/.ssh/deploy_key" \
+            dist/ "${REMOTE_USER}@${SERVER_IP}:${DEPLOY_PATH}"
+          echo -e "${GREEN}✅ Upload complete!${RESET}"
+
+      - name: 🧪 Test apache2 config
+        env:
+          SERVER_IP: ${{ secrets.SERVER_IP }}
+          REMOTE_USER: ${{ inputs.remote_user }}
+        run: |
+          echo -e "${CYAN}🧪 Testing apache2 config...${RESET}"
+          ssh -i ~/.ssh/deploy_key "${REMOTE_USER}@${SERVER_IP}" "sudo apachectl -t"
+          echo -e "${GREEN}✅ Config OK!${RESET}"
+
+      - name: 🔄 Restart apache2
+        env:
+          SERVER_IP: ${{ secrets.SERVER_IP }}
+          REMOTE_USER: ${{ inputs.remote_user }}
+        run: |
+          echo -e "${YELLOW}🔄 Restarting apache2...${RESET}"
+          ssh -i ~/.ssh/deploy_key "${REMOTE_USER}@${SERVER_IP}" "sudo systemctl restart apache2"
+          echo -e "${GREEN}🎉 Deploy finished!${RESET}"
