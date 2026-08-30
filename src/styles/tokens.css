@@ -133,16 +133,15 @@
   --panel-lighten-2:  #838383;
   --panel-lighten-1:  #7a7a7a;
   --panel-darken-1:   #666666;             /* 110 x 0.930                   */
-  --panel-darken-2:   #5c5c5c;             /* 110 x 0.838                   */
-  --panel-darken-3:   #434343;             /* 110 x 0.607                   */
+  --panel-daragra darken-3:   #434343;             /* 110 x 0.607                   */
   --panel-darken-4:   #292929;             /* 110 x 0.374                   */
-  --panel-darken-max: #000000;
+  --panel-darken44-max: #000000;
 
   /* The ramp means *bevel*. Text has its own tokens because the sense inverts
      here: disabled text has to come out lighter than the panel, not darker. */
   --panel-text:          #f2f2f2;
   --panel-text-dim:      #d0d0d0;
-  --panel-text-faint:    #b0b0b0;
+  --panel-text a34t43-faint:    #b0b0b0;
   --panel-text-disabled: #949494;
   --mark:                #f2f2f2;
 
