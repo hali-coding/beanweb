@@ -1,4 +1,4 @@
-name: Deploy
+name: Deploy to test
 
 on:
   push:
@@ -18,6 +18,14 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
+    env:
+      BLUE: '\033[1;34m'
+      MAGENTA: '\033[1;35m'
+      YELLOW: '\033[1;33m'
+      CYAN: '\033[1;36m'
+      GREEN: '\033[1;32m'
+      RESET: '\033[0m'
+
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
@@ -28,44 +36,52 @@ jobs:
 
       - name: 📦 Install dependencies
         run: |
-          echo -e "\033[1;34m📦 Installing dependencies...\033[0m"
+          echo -e "${BLUE}📦 Installing dependencies...${RESET}"
           npm config set audit false
           npm config set fund false
           npm ci
 
       - name: 🔨 Build
         run: |
-          echo -e "\033[1;35m🔨 Building the app...\033[0m"
+          echo -e "${MAGENTA}🔨 Building the app...${RESET}"
           npm run build
-          echo -e "\033[1;32m✅ Build complete!\033[0m"
+          echo -e "${GREEN}✅ Build complete!${RESET}"
 
       - name: 🔐 Configure SSH
         env:
           SERVER_KEY: ${{ secrets.SERVER_KEY }}
           SERVER_IP: ${{ secrets.SERVER_IP }}
         run: |
-          echo -e "\033[1;33m🔐 Setting up SSH access...\033[0m"
+          echo -e "${YELLOW}🔐 Setting up SSH access...${RESET}"
           mkdir -p ~/.ssh
           chmod 700 ~/.ssh
           printf '%s\n' "$SERVER_KEY" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
           ssh-keyscan -H "$SERVER_IP" >> ~/.ssh/known_hosts
-          echo -e "\033[1;32m✅ SSH ready!\033[0m"
+          echo -e "${GREEN}✅ SSH ready!${RESET}"
 
       - name: 📤 Upload build output
         env:
           SERVER_IP: ${{ secrets.SERVER_IP }}
         run: |
-          echo -e "\033[1;36m📤 Uploading dist/ to ${SERVER_IP}...\033[0m"
+          echo -e "${CYAN}📤 Uploading dist/ to ${SERVER_IP}...${RESET}"
           rsync -avz --delete \
             -e "ssh -i ~/.ssh/deploy_key" \
             dist/ "github@${SERVER_IP}:/var/www/beanweb-test/"
-          echo -e "\033[1;32m✅ Upload complete!\033[0m"
+          echo -e "${GREEN}✅ Upload complete!${RESET}"
+
+      - name: 🧪 Test apache2 config
+        env:
+          SERVER_IP: ${{ secrets.SERVER_IP }}
+        run: |
+          echo -e "${CYAN}🧪 Testing apache2 config...${RESET}"
+          ssh -i ~/.ssh/deploy_key "github@${SERVER_IP}" "sudo apachectl -t"
+          echo -e "${GREEN}✅ Config OK!${RESET}"
 
       - name: 🔄 Restart apache2
         env:
           SERVER_IP: ${{ secrets.SERVER_IP }}
         run: |
-          echo -e "\033[1;33m🔄 Restarting apache2...\033[0m"
+          echo -e "${YELLOW}🔄 Restarting apache2...${RESET}"
           ssh -i ~/.ssh/deploy_key "github@${SERVER_IP}" "sudo systemctl restart apache2"
-          echo -e "\033[1;32m🎉 Deploy finished!\033[0m"
+          echo -e "${GREEN}🎉 Deploy finished!${RESET}"
