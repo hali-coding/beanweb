@@ -97,6 +97,9 @@ Architecture, design-system rules and contributor conventions are in
 
 `bean-bot` is a PR comment workflow that helps maintain docs updates in PRs.
 
+When a PR is opened or reopened, bean-bot posts an introduction comment with
+the command quick start.
+
 - Trigger preview on a PR comment: `@bean-bot update docs`.
 - Optional intent is supported: `@bean-bot update docs mention changes to BASIC screen behavior`.
 - Apply a preview with: `@bean-bot apply <token>`.

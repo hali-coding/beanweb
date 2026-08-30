@@ -6,6 +6,7 @@ import { randomUUID } from 'node:crypto'
 import { execFileSync } from 'node:child_process'
 
 const BOT_MARKER = 'bean-bot:preview'
+const BOT_INTRO_MARKER = 'bean-bot:intro'
 const BOT_TAG = '@bean-bot'
 const ALLOWED_DOC_PATHS = ['README.md', 'docs/']
 const UPDATE_FILE = 'docs/pr-updates.md'
@@ -40,6 +41,22 @@ function parseCommand(body) {
   }
 
   return null
+}
+
+function renderIntroComment() {
+  return [
+    'bean-bot is now watching this PR for docs updates.',
+    '',
+    `Use ${BOT_TAG} update docs [optional intent] to generate a preview.`,
+    `Use ${BOT_TAG} apply <token> to commit the approved preview.`,
+    '',
+    'Rules:',
+    '- Only collaborators with write access can run bean-bot commands.',
+    '- Writes are scoped to README.md and docs/.',
+    '- If this PR comes from a fork, bean-bot will post fallback guidance instead of pushing.',
+    '',
+    `<!-- ${BOT_INTRO_MARKER} -->`,
+  ].join('\n')
 }
 
 function ghHeaders(token) {
@@ -275,15 +292,38 @@ function commitAndPush({ branch, token }) {
 async function main() {
   const token = env('GITHUB_TOKEN')
   const eventPath = env('GITHUB_EVENT_PATH')
+  const eventName = env('GITHUB_EVENT_NAME')
   const repoFull = env('GITHUB_REPOSITORY')
   const [owner, repo] = repoFull.split('/')
 
   const event = JSON.parse(readFileSync(eventPath, 'utf8'))
+
+  if (eventName === 'pull_request') {
+    const issueNumber = event?.pull_request?.number
+    if (!issueNumber) fail('Missing PR number in pull_request payload')
+
+    const comments = await getIssueComments({ owner, repo, issueNumber, token })
+    const alreadyIntroduced = comments.some((c) =>
+      String(c?.body || '').includes(`<!-- ${BOT_INTRO_MARKER} -->`),
+    )
+
+    if (!alreadyIntroduced) {
+      await postIssueComment({
+        owner,
+        repo,
+        issueNumber,
+        token,
+        body: renderIntroComment(),
+      })
+    }
+    return
+  }
+
   const issueNumber = event?.issue?.number
   const body = event?.comment?.body || ''
   const actor = event?.comment?.user?.login
 
-  if (!issueNumber || !actor) fail('Missing issue number or actor in event payload')
+  if (!issueNumber || !actor) fail('Missing issue number or actor in issue_comment payload')
 
   const command = parseCommand(body)
   if (!command) {

@@ -3,9 +3,11 @@ name: Bean Bot
 on:
   issue_comment:
     types: [created, edited]
+  pull_request:
+    types: [opened, reopened]
 
 concurrency:
-  group: bean-bot-${{ github.event.issue.number }}
+  group: bean-bot-${{ github.event.issue.number || github.event.pull_request.number }}
   cancel-in-progress: true
 
 permissions:
@@ -16,8 +18,11 @@ permissions:
 jobs:
   bean-bot:
     if: >-
+      (github.event_name == 'issue_comment' &&
       github.event.issue.pull_request != null &&
-      contains(github.event.comment.body, '@bean-bot')
+      contains(github.event.comment.body, '@bean-bot')) ||
+      (github.event_name == 'pull_request' &&
+      (github.event.action == 'opened' || github.event.action == 'reopened'))
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
@@ -31,7 +36,7 @@ jobs:
       - name: Checkout PR head
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v4
         with:
-          ref: refs/pull/${{ github.event.issue.number }}/head
+          ref: refs/pull/${{ github.event.issue.number || github.event.pull_request.number }}/head
           fetch-depth: 0
           path: pr
 
@@ -44,6 +49,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_EVENT_PATH: ${{ github.event_path }}
+          GITHUB_EVENT_NAME: ${{ github.event_name }}
           GITHUB_REPOSITORY: ${{ github.repository }}
           GITHUB_ACTOR: ${{ github.actor }}
         run: node ../bean-bot/.github/scripts/bean-bot.mjs
