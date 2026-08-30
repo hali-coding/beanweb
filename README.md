@@ -92,3 +92,16 @@ affiliated with Be Incorporated or the Haiku project.
 
 Architecture, design-system rules and contributor conventions are in
 [CLAUDE.md](CLAUDE.md).
+
+## Maintainers: bean-bot
+
+`bean-bot` is a PR comment workflow that helps maintain docs updates in PRs.
+
+- Trigger preview on a PR comment: `@bean-bot update docs`.
+- Optional intent is supported: `@bean-bot update docs mention changes to BASIC screen behavior`.
+- Apply a preview with: `@bean-bot apply <token>`.
+- Only collaborators with write access can run commands.
+- Current write scope is limited to `README.md` and `docs/`.
+
+The workflow lives in `.github/workflows/bean-bot.yml` and the runtime script
+is `.github/scripts/bean-bot.mjs`.
