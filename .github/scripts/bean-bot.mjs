@@ -1,9 +1,7 @@
 #!/usr/bin/env node
 
-import { readFileSync, existsSync } from 'node:fs'
-import { appendFileSync } from 'node:fs'
+import { readFileSync } from 'node:fs'
 import { randomUUID } from 'node:crypto'
-import { execFileSync } from 'node:child_process'
 
 const BOT_MARKER = 'bean-bot:preview'
 const BOT_INTRO_MARKER = 'bean-bot:intro'
@@ -75,6 +73,25 @@ async function ghFetchJson(url, token, init = {}) {
       ...(init.headers || {}),
     },
   })
+
+  if (!res.ok) {
+    const body = await res.text()
+    throw new Error(`GitHub API ${res.status} for ${url}: ${body}`)
+  }
+
+  return res.json()
+}
+
+async function ghFetchJsonOrNull(url, token, init = {}) {
+  const res = await fetch(url, {
+    ...init,
+    headers: {
+      ...ghHeaders(token),
+      ...(init.headers || {}),
+    },
+  })
+
+  if (res.status === 404) return null
 
   if (!res.ok) {
     const body = await res.text()
@@ -249,44 +266,43 @@ function findPreview(comments, requestedToken) {
   return null
 }
 
-function ensureUpdateFile() {
-  if (!existsSync(UPDATE_FILE)) {
-    const header = '# PR Documentation Updates\n\n'
-    appendFileSync(UPDATE_FILE, header, 'utf8')
+// The PR head is never checked out, so the file is read and written through
+// the Contents API on the head branch instead of through a working tree.
+async function readDocsFile({ owner, repo, ref, token }) {
+  const url = `https://api.github.com/repos/${owner}/${repo}/contents/${UPDATE_FILE}?ref=${encodeURIComponent(ref)}`
+  const data = await ghFetchJsonOrNull(url, token)
+  if (!data || Array.isArray(data) || data.type !== 'file') return null
+  // Over 1 MB the API answers with an empty body and encoding "none". Appending
+  // to that would replace the file with just the new entry, so refuse instead.
+  if (data.encoding !== 'base64') {
+    throw new Error(`${UPDATE_FILE} is too large to read through the Contents API`)
+  }
+  return {
+    sha: data.sha,
+    text: Buffer.from(data.content, 'base64').toString('utf8'),
   }
 }
 
-function appendEntryToDocs(entry, token) {
-  ensureUpdateFile()
+function nextDocsContents(current, entry, token) {
+  const header = '# PR Documentation Updates\n\n'
+  const base = current === null ? header : current
   const taggedEntry = `${entry.trimEnd()}\n\n<!-- bean-bot-applied:${token} -->\n\n`
-  appendFileSync(UPDATE_FILE, taggedEntry, 'utf8')
+  return `${base}${taggedEntry}`
 }
 
-function hasAppliedToken(token) {
-  if (!existsSync(UPDATE_FILE)) return false
-  const content = readFileSync(UPDATE_FILE, 'utf8')
-  return content.includes(`bean-bot-applied:${token}`)
-}
-
-function git(args) {
-  execFileSync('git', args, { stdio: 'pipe' })
-}
-
-function commitAndPush({ branch, token }) {
-  git(['config', 'user.name', 'bean-bot'])
-  git(['config', 'user.email', 'bean-bot@users.noreply.github.com'])
-  git(['add', UPDATE_FILE])
-
-  try {
-    git(['diff', '--cached', '--quiet'])
-    return false
-  } catch {
-    // diff --quiet exits non-zero when changes exist.
-  }
-
-  git(['commit', '-m', `docs: add PR update summary (${token})`])
-  git(['push', 'origin', `HEAD:${branch}`])
-  return true
+async function writeDocsFile({ owner, repo, branch, token, contents, sha, message }) {
+  const url = `https://api.github.com/repos/${owner}/${repo}/contents/${UPDATE_FILE}`
+  await ghFetchJson(url, token, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      message,
+      branch,
+      content: Buffer.from(contents, 'utf8').toString('base64'),
+      ...(sha ? { sha } : {}),
+      committer: { name: 'bean-bot', email: 'bean-bot@users.noreply.github.com' },
+    }),
+  })
 }
 
 async function main() {
@@ -420,11 +436,34 @@ async function main() {
       return
     }
 
-    const headRepo = latestPull.head.repo.full_name
+    const headRepo = latestPull.head.repo?.full_name
     const headBranch = latestPull.head.ref
     const sameRepo = headRepo === `${owner}/${repo}`
 
-    if (hasAppliedToken(command.token)) {
+    if (!sameRepo) {
+      await postIssueComment({
+        owner,
+        repo,
+        issueNumber,
+        token,
+        body: [
+          `@${actor} this PR comes from a fork (${headRepo || 'unknown'}).`,
+          'I cannot write to the fork branch with this token, so nothing was applied.',
+          '',
+          `Patch target: ${UPDATE_FILE}`,
+          'Please apply manually or re-run from a same-repo branch.',
+        ].join('\n'),
+      })
+      return
+    }
+
+    if (!ALLOWED_DOC_PATHS.some((p) => UPDATE_FILE === p || UPDATE_FILE.startsWith(p))) {
+      fail(`Refusing to edit out-of-scope path: ${UPDATE_FILE}`)
+    }
+
+    const current = await readDocsFile({ owner, repo, ref: headBranch, token })
+
+    if (current && current.text.includes(`bean-bot-applied:${command.token}`)) {
       await postIssueComment({
         owner,
         repo,
@@ -435,39 +474,22 @@ async function main() {
       return
     }
 
-    if (!ALLOWED_DOC_PATHS.some((p) => UPDATE_FILE === p || UPDATE_FILE.startsWith(p))) {
-      fail(`Refusing to edit out-of-scope path: ${UPDATE_FILE}`)
-    }
-
-    appendEntryToDocs(preview.entry, command.token)
-
-    if (!sameRepo) {
-      await postIssueComment({
-        owner,
-        repo,
-        issueNumber,
-        token,
-        body: [
-          `@${actor} preview applied locally but this PR comes from a fork (${headRepo}).`,
-          'I cannot safely push to the fork branch with this token.',
-          '',
-          `Patch target: ${UPDATE_FILE}`,
-          'Please apply manually or re-run from a same-repo branch.',
-        ].join('\n'),
-      })
-      return
-    }
-
     try {
-      const pushed = commitAndPush({ branch: headBranch, token: command.token })
+      await writeDocsFile({
+        owner,
+        repo,
+        branch: headBranch,
+        token,
+        contents: nextDocsContents(current?.text ?? null, preview.entry, command.token),
+        sha: current?.sha,
+        message: `docs: add PR update summary (${command.token})`,
+      })
       await postIssueComment({
         owner,
         repo,
         issueNumber,
         token,
-        body: pushed
-          ? `@${actor} docs update committed to ${headBranch}: ${UPDATE_FILE}`
-          : `@${actor} no changes to commit for token ${command.token}.`,
+        body: `@${actor} docs update committed to ${headBranch}: ${UPDATE_FILE}`,
       })
     } catch (error) {
       await postIssueComment({
@@ -476,7 +498,7 @@ async function main() {
         issueNumber,
         token,
         body: [
-          `@${actor} could not push docs update automatically.`,
+          `@${actor} could not commit the docs update automatically.`,
           '',
           `Branch: ${headBranch}`,
           `Target: ${UPDATE_FILE}`,

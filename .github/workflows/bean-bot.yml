@@ -27,29 +27,24 @@ jobs:
     timeout-minutes: 10
 
     steps:
+      # Only the base ref is ever checked out. The PR head is untrusted code and
+      # this job runs privileged (issue_comment, contents: write), so bean-bot
+      # reads and writes docs/pr-updates.md through the Contents API instead.
       - name: Checkout workflow ref (trusted)
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v4
         with:
-          fetch-depth: 0
+          persist-credentials: false
           path: bean-bot
-
-      - name: Checkout PR head
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v4
-        with:
-          ref: refs/pull/${{ github.event.issue.number || github.event.pull_request.number }}/head
-          fetch-depth: 0
-          path: pr
 
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v4
         with:
           node-version: "24"
 
       - name: Run bean-bot
-        working-directory: pr
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_EVENT_PATH: ${{ github.event_path }}
           GITHUB_EVENT_NAME: ${{ github.event_name }}
           GITHUB_REPOSITORY: ${{ github.repository }}
           GITHUB_ACTOR: ${{ github.actor }}
-        run: node ../bean-bot/.github/scripts/bean-bot.mjs
+        run: node bean-bot/.github/scripts/bean-bot.mjs
