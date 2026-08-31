@@ -105,6 +105,14 @@ the command quick start.
 - Apply a preview with: `@bean-bot apply <token>`.
 - Only collaborators with write access can run commands.
 - Current write scope is limited to `README.md` and `docs/`.
+- Fork PRs get fallback guidance instead of a commit; the token cannot write to
+  a fork branch.
 
 The workflow lives in `.github/workflows/bean-bot.yml` and the runtime script
 is `.github/scripts/bean-bot.mjs`.
+
+The job is privileged — `issue_comment` runs with the base repository's token
+and `contents: write` — so it **never checks out the PR head**. Only the base
+ref is on disk, and the docs file is read and written through the GitHub
+Contents API on the head branch. Keep it that way: a checkout of the head would
+put attacker-controlled code beside a write-scoped token.
