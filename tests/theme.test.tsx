@@ -36,16 +36,24 @@ describe('theme setting', () => {
    */
   it('persists the theme alongside the other settings', () => {
     vi.useFakeTimers()
-    useSettings.getState().setApiKey('sk-ant-persist')
     useSettings.getState().setTheme('dark')
     vi.advanceTimersByTime(300)
 
     const stored = JSON.parse(localStorage.getItem('beanweb.settings.v1') ?? '{}')
-    expect(stored).toMatchObject({
-      apiKey: 'sk-ant-persist',
-      model: DEFAULT_MODEL,
-      theme: 'dark',
-    })
+    expect(stored).toMatchObject({ model: DEFAULT_MODEL, theme: 'dark' })
+  })
+
+  /* The key is the one field that never lands in this record as itself. jsdom
+     has no IndexedDB, so sealing is unavailable here and it is not written at
+     all -- `tests/keystore.test.ts` runs the sealed path against a fake one. */
+  it('never writes the API key in clear text', async () => {
+    useSettings.getState().setApiKey('sk-ant-persist')
+    await vi.waitFor(() => expect(localStorage.getItem('beanweb.settings.v1')).not.toBeNull())
+
+    const raw = localStorage.getItem('beanweb.settings.v1') ?? ''
+    expect(raw).not.toContain('sk-ant-persist')
+    expect(JSON.parse(raw)).toMatchObject({ key: null })
+    expect(useSettings.getState().apiKey).toBe('sk-ant-persist')
   })
 
   it('reads an unknown or missing theme back as light', () => {

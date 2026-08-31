@@ -5,7 +5,7 @@ import type { MenuDef } from '@/widgets/Menu'
 import { Button, ScrollView } from '@/widgets/controls'
 import { ClaudeIcon } from '@/lib/icons'
 import { useDesktop } from '@/store/desktop'
-import { maskKey, useSettings } from '@/store/settings'
+import { keyReady, maskKey, useSettings } from '@/store/settings'
 import {
   FALLBACK_MODELS,
   requestShape,
@@ -205,6 +205,12 @@ export function Claude({ windowId }: AppProps) {
     if (!text || streaming) return
 
     let key = apiKey
+    if (!key) {
+      // A stored key is unsealed asynchronously, so at boot it can still be in
+      // flight. Wait for that before concluding there is none and asking.
+      await keyReady
+      key = useSettings.getState().apiKey
+    }
     if (!key) {
       const entered = await promptForKey()
       if (!entered) return
