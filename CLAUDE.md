@@ -59,6 +59,7 @@ src/
   styles/     tokens.css (R5 palette) + reset, widgets, wm, shell
   lib/        types.ts, icons.tsx (original 32-unit-grid SVGs), theme.ts,
               disk.ts (the shared reset-disk confirmation),
+              keystore.ts (sealed storage for the API key),
               transfer.ts (import/export between the host and the disk),
               basic/ (the BASIC engine), beanchallenge/ (the game's rules)
   store/      desktop.ts (windows, focus, modals), fs.ts (virtual FS),
@@ -414,14 +415,32 @@ Events, not mouse events.
 Anthropic API **directly from the browser** with `dangerouslyAllowBrowser: true`,
 because the project has no backend to proxy through.
 
-- The key lives in `store/settings.ts` under `beanweb.settings.v1` and is
-  **entered by the user**. Never hard-code one, never commit one, never write one
+- The key is **entered by the user** and lives in `store/settings.ts` under
+  `beanweb.settings.v1`. Never hard-code one, never commit one, never write one
   into the virtual filesystem, and never log it.
 - Render it only through `maskKey()`. It must not appear in full anywhere.
-- The security tradeoff is real: any script on the page can read it. That is
-  acceptable for a local desktop toy — the Anthropic docs sanction exactly this
-  "internal tool / development" case — and **not** acceptable for a public
-  deploy. If this is ever hosted, the app needs a server-side proxy first.
+- **It is never written in clear text.** `lib/keystore.ts` seals it with AES-GCM
+  under a **non-extractable** `CryptoKey` kept in IndexedDB — the browser will
+  encrypt and decrypt with that key but will never hand out its bytes — and only
+  the ciphertext goes to `localStorage`. The key cannot simply be hashed: every
+  request sends it to the API, so it has to come back out.
+- **Sealing failing means not persisting, never persisting plainly.** Outside a
+  secure context there is no `crypto.subtle`, and some private modes have no
+  IndexedDB; `seal()` returns null there and the key lasts the session only.
+- **The key is the one setting that is not there on the first tick.** `load()`
+  is synchronous, the unseal is not, so `keyReady` resolves once the key has
+  been decrypted into the store — `send()` in `apps/Claude.tsx` awaits it before
+  concluding there is no key and prompting. Model and theme stay plain text
+  because `index.html` reads the theme back before React boots.
+- A record still holding a plaintext `apiKey` is from before this and is
+  migrated on the next boot: adopted synchronously, then rewritten sealed, which
+  is what takes the clear text off the disk.
+- The security tradeoff is still real: any script on the page can call `unseal`
+  as easily as the store does. Sealing defeats the passive cases — a profile
+  dump, a synced backup, the next person at the machine — not a hostile script.
+  Acceptable for a local desktop toy, the case the Anthropic docs sanction, and
+  **not** acceptable for a public deploy. If this is ever hosted, the app needs
+  a server-side proxy first.
 - Stream (`client.messages.stream`) and resend the **full**
   `Anthropic.MessageParam[]` history every turn — the API is stateless. Do not
   use assistant prefill; it returns 400 on the 4.6+ family.
@@ -444,6 +463,10 @@ because the project has no backend to proxy through.
   infinite-loop shape as the `useShallow` rule above.
 - Stream deltas are buffered in a ref and flushed on `requestAnimationFrame`,
   the same rule as window drag: never one render per token.
+- `tests/keystore.test.ts` reaches the sealed path through `fake-indexeddb`,
+  jsdom having none of its own, and boots a fresh copy of the store module for
+  each case because `hydrateKey` runs once at import. It is the only cover for
+  the migration.
 - Tests must mock `@anthropic-ai/sdk`. No test may make a network call. Copy the
   real error classes onto the mock so `instanceof` branches still work — see
   `tests/claude.test.tsx`.
