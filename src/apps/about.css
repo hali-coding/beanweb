@@ -43,6 +43,17 @@
 .about-specs dt { color: var(--panel-text-dim); }
 .about-specs dd { margin: 0; }
 
+/* The one link here. R5 had no hypertext in About, so it borrows the
+   navigation colour rather than inventing a link palette of its own. */
+.about-link {
+  color: var(--navigation);
+  text-decoration: underline;
+}
+.about-link:focus-visible {
+  outline: calc(2 * var(--hairline)) solid var(--navigation);
+  outline-offset: 1px;
+}
+
 .about-credit {
   margin: 0;
   font-size: var(--fs-small);

@@ -7,6 +7,8 @@ import { registerApp } from './registry'
 import type { AppProps } from './registry'
 import './about.css'
 
+const REPO_URL = 'https://github.com/hali-coding/beanweb'
+
 /** Modelled on R5's "About this System": logo block left, spec sheet right. */
 export function About({ windowId }: AppProps) {
   const requestClose = useDesktop((s) => s.requestClose)
@@ -39,6 +41,12 @@ export function About({ windowId }: AppProps) {
         </dd>
         <dt>Volume</dt>
         <dd>{nodeCount} nodes in localStorage</dd>
+        <dt>Source</dt>
+        <dd>
+          <a className="about-link" href={REPO_URL} target="_blank" rel="noreferrer">
+            github.com/hali-coding/beanweb
+          </a>
+        </dd>
       </dl>
 
       <p className="about-credit">
@@ -63,7 +71,7 @@ registerApp({
   component: About,
   icon: AboutIcon,
   defaultW: 400,
-  defaultH: 330,
+  defaultH: 352,
   minW: 320,
   minH: 300,
   singleton: true,
