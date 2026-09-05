@@ -102,23 +102,38 @@ export async function importFromHost(dir: string): Promise<string[]> {
 }
 
 /**
- * Hand a text node to the browser as a download. False if the path is not a
- * text node -- directories and application stubs have no content to write.
+ * Hand a name and some text to the browser as a download.
+ *
+ * Split out of `exportNode` because Draw exports a drawing it is holding in
+ * memory rather than one on the disk, and the anchor-and-object-URL dance
+ * below is exactly the sort of thing that must not exist in two places.
  */
-export function exportNode(path: string): boolean {
-  const node = useFs.getState().nodes[path]
-  if (!node || node.kind !== 'text') return false
-
-  const blob = new Blob([node.content ?? ''], { type: 'text/plain;charset=utf-8' })
+export function exportText(name: string, text: string, mime = 'text/plain;charset=utf-8'): void {
+  const blob = new Blob([text], { type: mime })
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url
-  a.download = node.name
+  a.download = name
   // An anchor outside the document does not reliably start a download.
   document.body.appendChild(a)
   a.click()
   a.remove()
   // Revoking in the same task races the download; let the click finish first.
   setTimeout(() => URL.revokeObjectURL(url), 0)
+}
+
+/** What an extension means to the browser, so a saved `.svg` opens as one. */
+export function mimeFor(name: string): string {
+  return name.toLowerCase().endsWith('.svg') ? 'image/svg+xml' : 'text/plain;charset=utf-8'
+}
+
+/**
+ * Hand a text node to the browser as a download. False if the path is not a
+ * text node -- directories and application stubs have no content to write.
+ */
+export function exportNode(path: string): boolean {
+  const node = useFs.getState().nodes[path]
+  if (!node || node.kind !== 'text') return false
+  exportText(node.name, node.content ?? '', mimeFor(node.name))
   return true
 }

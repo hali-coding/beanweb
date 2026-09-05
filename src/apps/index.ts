@@ -5,6 +5,7 @@
 import './Tracker'
 import './Terminal'
 import './StyledEdit'
+import './Draw'
 import './Tetris'
 import './BeanChallenge'
 import './Basic'

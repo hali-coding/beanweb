@@ -213,6 +213,19 @@ export function ClaudeIcon({ size = 32, className }: IconProps) {
 }
 
 /** A listing on a screen: line numbers down the left, code to the right. */
+export function DrawIcon({ size = 32, className }: IconProps) {
+  return (
+    <svg {...box(size)} className={className}>
+      <path d="M3 26c6-16 20-16 26 0" fill="none" stroke="#2f6ea8" strokeWidth="2" strokeLinecap="round" />
+      <rect x="1" y="24" width="5" height="5" fill="#fdfdfd" stroke="#3b3b3b" strokeWidth="1.5" />
+      <rect x="26" y="24" width="5" height="5" fill="#fdfdfd" stroke="#3b3b3b" strokeWidth="1.5" />
+      <path d="M20 3l7 5-11 13-5 2 1-5z" fill="#ffc900" stroke="#3b3b3b" strokeWidth="1.5" strokeLinejoin="round" />
+      <path d="M20 3l7 5-2 3-7-5z" fill="#c8a01c" stroke="#3b3b3b" strokeWidth="1.5" strokeLinejoin="round" />
+      <path d="M11 23l3 1" stroke="#3b3b3b" strokeWidth="1.5" />
+    </svg>
+  )
+}
+
 export function BasicIcon({ size = 32, className }: IconProps) {
   return (
     <svg {...box(size)} className={className}>
