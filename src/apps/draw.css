@@ -1,0 +1,336 @@
+/*
+ * Draw.
+ *
+ * Unlike Tetris's well or Bean Challenge's board, the drawing surface is
+ * chrome rather than a play surface: the page is `--document` on a darkened
+ * pasteboard, so it follows the theme. Only the artwork inside it is the
+ * user's own colour, and that is never themed.
+ */
+
+.draw {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  background: var(--panel);
+}
+
+.draw-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  gap: 6px;
+  padding: 6px;
+}
+
+/* ------------------------------------------------------------- the toolbox */
+
+.draw-tools {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+/* .b-button carries a 68px minimum meant for OK/Cancel; a tool is square. */
+.draw-tool {
+  min-width: 0;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  font-size: 13px;
+  line-height: 1;
+}
+
+/* The selected tool stays pressed, which is the bevel :active already draws. */
+.draw-tool[data-active='true'] {
+  box-shadow:
+    inset var(--hairline) var(--hairline) 0 0 var(--panel-darken-3),
+    inset calc(-1 * var(--hairline)) calc(-1 * var(--hairline)) 0 0 var(--panel-lighten-max),
+    inset calc(2 * var(--hairline)) calc(2 * var(--hairline)) 0 0 var(--panel-darken-2),
+    inset calc(-2 * var(--hairline)) calc(-2 * var(--hairline)) 0 0 var(--panel-lighten-1);
+  padding-top: var(--hairline);
+  background: var(--panel-darken-1);
+}
+
+/* ------------------------------------------------------------ the pasteboard */
+
+.draw-stage {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+  padding: 8px;
+  background: var(--panel-darken-2);
+  box-shadow:
+    inset var(--hairline) var(--hairline) 0 0 var(--panel-darken-3),
+    inset calc(-1 * var(--hairline)) calc(-1 * var(--hairline)) 0 0 var(--panel-lighten-max),
+    inset calc(2 * var(--hairline)) calc(2 * var(--hairline)) 0 0 var(--panel-darken-2),
+    inset calc(-2 * var(--hairline)) calc(-2 * var(--hairline)) 0 0 var(--panel-lighten-1);
+}
+
+.draw-surface {
+  display: block;
+  /* The page casts a shadow onto the pasteboard, as a sheet of paper does. */
+  box-shadow: 2px 2px 0 0 var(--shadow-cast);
+  touch-action: none;
+}
+
+.draw-page {
+  fill: var(--document);
+}
+
+/* Each tool says what it does before you press it. */
+.draw[data-tool='pick'] .draw-surface { cursor: default; }
+.draw[data-tool='node'] .draw-surface { cursor: default; }
+.draw[data-tool='text'] .draw-surface { cursor: text; }
+.draw[data-tool='rect'] .draw-surface,
+.draw[data-tool='ellipse'] .draw-surface,
+.draw[data-tool='polyline'] .draw-surface,
+.draw[data-tool='freehand'] .draw-surface { cursor: crosshair; }
+
+/* --------------------------------------------------- selection and handles */
+
+/*
+ * The overlay is chrome drawn over the artwork, so it uses the navigation
+ * accent rather than any of the user's colours. Every stroke here is
+ * non-scaling, or zooming to 400% would give the selection a four-pixel edge.
+ */
+.draw-overlay * {
+  vector-effect: non-scaling-stroke;
+}
+
+.draw-marchers {
+  stroke: var(--navigation);
+  stroke-width: 1;
+  stroke-dasharray: 3 3;
+}
+
+.draw-handle {
+  fill: var(--panel-lighten-max);
+  stroke: var(--navigation);
+  stroke-width: 1;
+  cursor: pointer;
+}
+
+.draw-rotstem,
+.draw-hstem {
+  stroke: var(--navigation);
+  stroke-width: 1;
+}
+
+.draw-hstem {
+  stroke-dasharray: 2 2;
+}
+
+/* A path node: hollow for a cusp, filled for a smooth one. */
+.draw-node {
+  fill: var(--panel-lighten-max);
+  stroke: var(--navigation);
+  stroke-width: 1;
+  cursor: pointer;
+}
+
+.draw-node[data-smooth='true'] {
+  fill: var(--navigation);
+}
+
+.draw-grip {
+  fill: var(--navigation);
+  stroke: var(--panel-lighten-max);
+  stroke-width: 1;
+  cursor: pointer;
+}
+
+/*
+ * One invisible stripe per segment, so a double-click can say which segment it
+ * landed on without any geometry. Its width comes from the app, in document
+ * units, so it stays about a finger wide at every zoom.
+ */
+.draw-seg {
+  fill: none;
+  stroke: transparent;
+  cursor: crosshair;
+}
+
+/*
+ * The rubber band. Exactly one of these exists; the gesture writes its `d`
+ * inside a requestAnimationFrame and React never re-renders during a drag.
+ */
+.draw-preview {
+  fill: none;
+  stroke: var(--navigation);
+  stroke-width: 1;
+  stroke-dasharray: 4 3;
+  vector-effect: non-scaling-stroke;
+  pointer-events: none;
+}
+
+/* ------------------------------------------------------------ the side panel */
+
+.draw-side {
+  flex: none;
+  width: 132px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/*
+ * Fill grows by three rows once a gradient is on, which can push the panel
+ * past the window. The properties scroll; Duplicate and Delete are actions,
+ * not properties, and must never scroll out of reach.
+ */
+.draw-props {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.draw-swatches {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 3px;
+}
+
+.draw-swatch {
+  appearance: none;
+  height: 16px;
+  padding: 0;
+  border: none;
+  cursor: pointer;
+  box-shadow:
+    inset var(--hairline) var(--hairline) 0 0 var(--panel-darken-3),
+    inset calc(-1 * var(--hairline)) calc(-1 * var(--hairline)) 0 0 var(--panel-lighten-max);
+}
+
+.draw-swatch[data-active='true'] {
+  box-shadow: 0 0 0 2px var(--navigation);
+}
+
+/* "No fill" is drawn the way every editor draws it: a red bar through white. */
+.draw-swatch--none {
+  background:
+    linear-gradient(to bottom right,
+      transparent calc(50% - 1px), #d02020 calc(50% - 1px),
+      #d02020 calc(50% + 1px), transparent calc(50% + 1px)),
+    var(--panel-lighten-max);
+}
+
+/* Flat / Lin / Rad. Three tool-sized buttons sharing the width. */
+.draw-modes {
+  display: flex;
+  gap: 3px;
+  margin-top: 5px;
+}
+
+.draw-mode {
+  min-width: 0;
+  flex: 1 1 0;
+  padding: 1px 0;
+  font-size: var(--fs-small);
+}
+
+.draw-mode[data-active='true'] {
+  box-shadow:
+    inset var(--hairline) var(--hairline) 0 0 var(--panel-darken-3),
+    inset calc(-1 * var(--hairline)) calc(-1 * var(--hairline)) 0 0 var(--panel-lighten-max),
+    inset calc(2 * var(--hairline)) calc(2 * var(--hairline)) 0 0 var(--panel-darken-2),
+    inset calc(-2 * var(--hairline)) calc(-2 * var(--hairline)) 0 0 var(--panel-lighten-1);
+  padding-top: calc(1px + var(--hairline));
+  background: var(--panel-darken-1);
+}
+
+.draw-sublabel {
+  margin-top: 5px;
+  font-size: var(--fs-small);
+  color: var(--panel-text-dim);
+}
+
+.draw-field {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 5px;
+  font-size: var(--fs-small);
+  color: var(--panel-text-dim);
+}
+
+.draw-field .b-textcontrol {
+  width: 100%;
+  min-width: 0;
+}
+
+.draw-buttons {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.draw-buttons .b-button {
+  min-width: 0;
+  width: 100%;
+}
+
+/* ------------------------------------------------------------- status line */
+
+.draw-status {
+  flex: none;
+  display: flex;
+  align-items: center;
+  height: 17px;
+  padding: 0 6px;
+  font-size: var(--fs-small);
+  color: var(--panel-text-dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ------------------------------------------------------------- narrow, touch */
+
+/*
+ * Below the breakpoint the window is full-bleed and there is no room for a
+ * column either side, so the toolbox becomes a strip across the top and the
+ * side panel drops underneath -- the same flip .bean-body makes.
+ */
+@media (max-width: 768px) {
+  .draw-body {
+    flex-direction: column;
+  }
+
+  .draw-tools {
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+
+  .draw-side {
+    width: auto;
+    flex: none;
+    flex-direction: row;
+    align-items: stretch;
+  }
+
+  .draw-props {
+    flex-direction: row;
+    align-items: flex-start;
+    overflow-x: auto;
+    overflow-y: visible;
+  }
+}
+
+@media (pointer: coarse) {
+  .draw-tool {
+    width: 32px;
+    height: 32px;
+    font-size: 15px;
+  }
+
+  .draw-swatch {
+    height: 24px;
+  }
+}

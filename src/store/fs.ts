@@ -174,6 +174,19 @@ COLOR 15
 PRINT "BEANWEB QBASIC";
 `
 
+/**
+ * The sample drawing. Deliberately uses a rect, an ellipse, a curve and a text
+ * run, so opening it exercises every shape kind Draw can edit.
+ */
+const BEANS_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="512" height="384" viewBox="0 0 512 384">
+  <rect x="24" y="24" width="464" height="336" rx="10" fill="#ffffff" stroke="#336698" stroke-width="3"/>
+  <text x="150" y="96" font-family="var(--font-plain)" font-size="30" fill="#336698" stroke="none" stroke-width="1">Two beans</text>
+  <ellipse cx="180" cy="196" rx="76" ry="58" fill="#ffc900" stroke="#000000" stroke-width="2"/>
+  <ellipse cx="326" cy="212" rx="58" ry="76" fill="#3d7a2f" stroke="#000000" stroke-width="2"/>
+  <path d="M 90 306 C 170 260 330 350 420 296" fill="none" stroke="#c04a2b" stroke-width="4"/>
+</svg>
+`
+
 function seed(): Record<string, FsNode> {
   const nodes: FsNode[] = [
     dir('/'),
@@ -183,6 +196,7 @@ function seed(): Record<string, FsNode> {
     dir('/boot/home/config'),
     dir('/boot/home/documents'),
     dir('/boot/home/basic'),
+    dir('/boot/home/drawings'),
     // Empty until the level editor lands; `.bcl` files are what it will write.
     dir('/boot/home/beanchallenge'),
     dir('/boot/apps'),
@@ -200,6 +214,8 @@ function seed(): Record<string, FsNode> {
       'BeanWeb 0.1.0\nkernel: javascript\nabi: dom\n',
     ),
 
+    file('/boot/home/drawings/beans.svg', BEANS_SVG),
+
     file('/boot/home/basic/hello.bas', HELLO_BAS),
     file('/boot/home/basic/guess.bas', GUESS_BAS),
     file('/boot/home/basic/sunset.bas', SUNSET_BAS),
@@ -208,6 +224,7 @@ function seed(): Record<string, FsNode> {
     app('/boot/apps/Tracker', 'tracker'),
     app('/boot/apps/Terminal', 'terminal'),
     app('/boot/apps/StyledEdit', 'styledit'),
+    app('/boot/apps/Draw', 'draw'),
     app('/boot/apps/Tetris', 'tetris'),
     app('/boot/apps/BeanChallenge', 'beanchallenge'),
     app('/boot/apps/BASIC', 'basic'),

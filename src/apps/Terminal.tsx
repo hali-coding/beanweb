@@ -86,6 +86,7 @@ export function Terminal({ windowId, args }: AppProps) {
               'cat <file>      print a file',
               'edit <file>     open a file in StyledEdit',
               'basic <file>    open a program in BASIC',
+              'draw <file>     open a drawing in Draw',
               'open <app>      launch an application',
               'mkdir <dir>     create a directory',
               'touch <file>    create an empty file',
@@ -152,6 +153,15 @@ export function Terminal({ windowId, args }: AppProps) {
           if (state.nodes[target]?.kind === 'dir') return emit(`basic: ${arg}: is a directory`, 'err')
           if (!state.nodes[target]) state.write(target, '')
           launchApp('basic', { path: target }, basename(target))
+          break
+        }
+
+        case 'draw': {
+          if (!arg) return emit('draw: missing operand', 'err')
+          const target = resolvePath(cwd, arg)
+          if (state.nodes[target]?.kind === 'dir') return emit(`draw: ${arg}: is a directory`, 'err')
+          if (!state.nodes[target]) state.write(target, '')
+          launchApp('draw', { path: target }, basename(target))
           break
         }
 

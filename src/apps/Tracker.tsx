@@ -79,8 +79,11 @@ export function Tracker({ windowId, args }: AppProps) {
       } else if (node.kind === 'app' && node.appId) {
         launchApp(node.appId)
       } else if (node.name.toLowerCase().endsWith('.bas')) {
-        // Programs open in the interpreter, everything else in the editor.
+        // Programs open in the interpreter, drawings in Draw, the rest in the
+        // editor.
         launchApp('basic', { path: node.path }, node.name)
+      } else if (node.name.toLowerCase().endsWith('.svg')) {
+        launchApp('draw', { path: node.path }, node.name)
       } else {
         launchApp('styledit', { path: node.path }, node.name)
       }

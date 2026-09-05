@@ -11,7 +11,7 @@ npm run dev        # Vite dev server with HMR
 npm run build      # tsc -b && vite build  -> dist/
 npm run preview    # serve the production build
 npm run typecheck  # types only
-npm test           # vitest run  (395 tests)
+npm test           # vitest run  (519 tests)
 npm run test:watch # vitest, watch mode
 ```
 
@@ -61,7 +61,8 @@ src/
               disk.ts (the shared reset-disk confirmation),
               keystore.ts (sealed storage for the API key),
               transfer.ts (import/export between the host and the disk),
-              basic/ (the BASIC engine), beanchallenge/ (the game's rules)
+              basic/ (the BASIC engine), beanchallenge/ (the game's rules),
+              draw/ (the vector document model and the SVG file format)
   store/      desktop.ts (windows, focus, modals), fs.ts (virtual FS),
               settings.ts (API key, model, theme)
   wm/         BWindow, WindowLayer, useWindowGesture, useViewport
@@ -298,6 +299,136 @@ reordering levels never disturbs a save. The legend is one table in `tiles.ts`
 and both lookup directions are derived from it — add a tile there and the map
 character, the palette label and the round-trip all follow.
 
+## Draw
+
+A vector illustration app in the shape of **CorelDRAW**: a toolbox down the left
+edge, a fixed-width property panel on the right, a status line naming the
+selection, and a page that is a *drawing* rather than a bitmap. Documents are
+real `.svg` files in `/boot/home/drawings`.
+
+`lib/draw/` is pure data with no DOM, like `lib/basic/screen.ts` and
+`lib/beanchallenge/engine.ts` — which is what puts the entire geometry and file
+layer inside the jsdom suite. `types.ts` is the model, `geom.ts` the
+measurement and transforms, `ops.ts` every mutation as `(doc, …) => DrawDoc`,
+and `svg.ts` the two directions of the file format.
+
+- **The canvas is a live SVG DOM, not a `<canvas>`.** Objects are
+  React-rendered `<svg>` children, so saving is serialising the same tree that
+  is on screen and there is no second representation to drift. It also means
+  **there is no hit-testing code in the app at all**: handles, path nodes and
+  bezier grips are real elements carrying `data-handle` / `data-node`, and
+  `pointerdown` plus `.closest()` does the whole job. That is the one part of a
+  drawing program jsdom can actually test.
+- **Rect and ellipse are not paths.** A rectangle has to save as `<rect>` or
+  the file is unreadable to anything else and the round trip dies on the first
+  save. The node tool therefore cannot touch one, and the answer is
+  CorelDRAW's own: *Object → Convert to curves* (`toPath`), which is `Alt+Q`
+  and is where an editable path comes from.
+- **Geometry is baked; only rotation is a transform.** Moving a rect changes
+  `x`/`y`. Rotation stays a `rotation` field emitted as `rotate(deg cx cy)`,
+  because baking a rotation into a rect would force it to become a path. The
+  parser recognises exactly that one form and restores the field, which is what
+  keeps a rotated rect a rect through a save/open cycle.
+- **`toSVG` and `parseSVG` are exact inverses**, the same contract
+  `formatLevel`/`parseLevel` hold in `lib/beanchallenge/level.ts`. `toSVG` is a
+  hand-rolled string emitter rather than `XMLSerializer` so element and
+  attribute order are deterministic; every number goes through one 3-decimal
+  formatter so a save is byte-stable.
+- **A rectangle's `rx` is a corner radius, not a second shape.** The panel
+  offers *Corners → Radius* whenever a rect is selected or the rect tool is up,
+  and remembers it for the next rectangle drawn. `scaleShape` scales it with
+  the shape and `toPath` clamps it to half the shorter side, so a radius larger
+  than the rect converts to a stadium rather than a tangled path.
+- **A gradient is always relative to the shape's own box**
+  (`objectBoundingBox`), never to the page. That is the entire reason it can be
+  modelled at all: a box-relative gradient follows its shape through every
+  move, resize and rotate for free, so nothing in `geom.ts` knows gradients
+  exist. A `LinearGradient` is one angle plus stops; a `RadialGradient` is just
+  stops. Strokes are colour-only.
+- **`parseSVG` adopts a gradient only if it could write it back identically** —
+  box-relative, unit-length, centred on its own axis, two or more opaque stops,
+  no `gradientTransform` or `href`. Anything else keeps its `url(#id)` fill and
+  its definition in the preamble: it still paints, it still saves, it just
+  cannot be edited, and `lossy` says so. Refusing is what keeps the round trip
+  exact rather than approximate. The spec's default `(0,0)->(1,0)` *is*
+  accepted — it is the same ramp as our own `(0,0.5)->(1,0.5)`, and only the
+  direction and the midpoint's projection along it matter.
+- **Two gradient traps, both with tests.** Gradient vectors are emitted at
+  **six** decimals, not three: the angle is rebuilt with `atan2` on the way
+  back in, and at three decimals 37° returns as 37.02 and the drawing drifts a
+  little on every save. And an adopted gradient is **removed from the
+  preamble**, because it is re-emitted from the model — keeping both would
+  stack another copy into the file on every save.
+- **Gradient element ids are numbered by position** (`bw-grad-0`, `bw-grad-1`),
+  not derived from the shape id, because shape ids are regenerated on every
+  parse and `toSVG(parseSVG(s)) === s` has to hold. `gradientDefs` produces the
+  `<defs>` markup and **both** `toSVG` and the live `<svg>` render that same
+  string, so what is on screen and what is in the file cannot drift.
+- **The property panel shows the selection, not the tool.** Selecting a shape
+  puts its own fill, outline and corner radius in the panel; the tool keeps
+  whatever was last chosen and hands it to the next shape drawn. The properties
+  scroll, and Duplicate/Delete are pinned below them — they are actions, not
+  properties, and must never scroll out of reach.
+- **Nothing a file contains is ever dropped.** What the parser cannot model
+  becomes a `foreign` shape holding its own markup, re-emitted verbatim in its
+  original place in the paint order; `<defs>`/`<style>` are hoisted to
+  `doc.preamble` and written back first, so a `url(#gradient)` fill still
+  resolves and still saves. Every approximation is named in `doc.lossy`, and
+  the app raises one alert from that list when the file opens. Foreign markup
+  is rendered into the page, so `sanitize()` runs first — and it works on the
+  **parsed element, not on its serialisation**: it walks the DOM the parser
+  already built, drops what executes (`<script>`, `<iframe>`, a SMIL `<set
+  attributeName="onload">`), removes every `on*` attribute, and holds URL
+  attributes to a scheme allowlist (`https:`, `mailto:`, a raster `data:`;
+  never `javascript:`, `vbscript:` or `data:image/svg+xml`). A regex over
+  markup has to re-implement the parser to know where a tag ends, and the
+  one that used to live here only knew the literal string `javascript:`.
+- **A live drag never re-renders.** Same rule as `useWindowGesture`: the
+  gesture lives in a ref, a `requestAnimationFrame` writes one attribute, and
+  React is touched once on `pointerup`. The rubber band is a single `<path>`
+  the gesture mutates. For moving and resizing, the gesture writes `transform`
+  on the very `<g data-id>` **React itself owns** — so an interfering render
+  restores the correct value and the worst case is a visual jump, never a
+  corrupted model. Do not mutate an attribute React does not also control.
+- **Screen to document is arithmetic, never `getScreenCTM`.** The `<svg>` is
+  sized `doc.width * zoom` over a viewBox of `doc.width`, so one CSS pixel is
+  `1/zoom` document units and the scroll offset is already inside
+  `getBoundingClientRect()`. jsdom has no `getScreenCTM`, no `getBBox`, no
+  `createSVGPoint` and no `elementFromPoint`; under it the rect reads zeros at
+  zoom 1, so `toDocPoint` degenerates to raw client coordinates and the tests
+  drive the real gesture code with plain numbers. Do not "fix" this with a CTM.
+- **Text bounds are estimated, not measured** (0.6 em per character), because
+  `getBBox` does not exist under jsdom and a bounding box that depends on the
+  environment is the same class of bug as trusting `offsetWidth`. Resizing text
+  scales `fontSize` rather than a box, so the error never compounds.
+- **`fitPage` runs inside `commit`, not at the call sites.** The page grows to
+  hold whatever an edit put outside it, and doing that per call site is how
+  move came to be missing it while draw and resize had it — a shape dragged
+  past the right edge was clipped against a viewBox that never grew. It only
+  grows right and down: the page origin is fixed at 0,0, so a shape dragged
+  above or left of it is still clipped. A document arriving from disk goes
+  through `adopt`, not `commit`, so opening a file never rewrites the page size
+  it was saved with.
+- **`dirty` is reference identity** — `doc !== savedDoc` — not a flag. Every op
+  returns a new document, so undoing back past the save point clears the
+  asterisk by itself. `savedDoc` is seeded with the initial doc, or an untitled
+  drawing is born dirty and prompts on close. Undo is a 50-deep stack of
+  snapshots in a ref; untouched shapes are shared by reference, so a snapshot
+  costs an array.
+- Selection is one object at a time, which is what the Arrange menu and the
+  property panel are written against. Marquee and multiple selection are the
+  obvious next step and nothing here is in their way.
+- The drawing surface is **chrome, and is themed**: the page is `--document` on
+  a `--panel-darken-2` pasteboard. Only the artwork keeps the user's own
+  colours. This is the opposite of Terminal, Tetris and Bean Challenge, which
+  are play surfaces with palettes of their own.
+
+`.svg` opens in Draw from Tracker and from Terminal's `draw <file>`, the same
+way `.bas` opens in BASIC. `lib/transfer.ts` grew `exportText(name, text, mime)`
+so *File → Export SVG…* can hand the browser a drawing that is not on the disk;
+`exportNode` is now just its filesystem-node caller.
+
+
 ## Design system
 
 Greys are **derived, not picked**. R5 computes every shade from the panel colour
@@ -520,6 +651,10 @@ because the project has no backend to proxy through.
 Replicants, the 3×3 Workspaces switcher, Pulse, DeskCalc, NetPositive, and media
 apps. Window stacking/tiling (dragging one tab onto another) is not implemented;
 tab *sliding* along the top edge is, via Shift-drag.
+
+**Draw's marquee and multiple selection.** One object is selected at a time
+today. `unionBounds` and `containsBounds` in `lib/draw/geom.ts` are already the
+predicates a marquee needs.
 
 **Bean Challenge's level editor.** Not built, but everything it needs is:
 `formatLevel` round-trips a board back to text, `formatLevelFile` /
