@@ -13,3 +13,7 @@ IDEAS.md
 
 # Built packages -- pkgs/ holds the sources, `npm run build:pkgs` makes these.
 pkgs/dist/
+pkgs/**/
+!pkgs/iconedit
+!pkgs/mushroom-command
+

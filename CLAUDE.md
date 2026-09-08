@@ -470,6 +470,14 @@ protocol inside the jsdom suite.
 - **Every guest path is resolved with `resolvePath` and then checked for the
   package root prefix.** `resolvePath` already collapses `..` and clamps at
   `/`; re-implementing the traversal rules is how the two come to disagree.
+- **A permission is consent and a gate, never the enforcement.** `fs` is one
+  switch the bridge checks before it dispatches a verb, and the sentence in
+  `PERMISSION_LABELS` is the whole of what the user was told before agreeing.
+  It says *whether*, not *where* — the scope is the path check above, which
+  refuses the same paths whatever the manifest claims. So a label has to
+  describe the scope actually enforced, and an unknown entry is a warning that
+  grants nothing rather than an error that installs nothing. The section in
+  `docs/packages.md` is the reference, and adding one is three places.
 - **The index and the payload live apart.** Manifests go to `localStorage`
   because `main.tsx` must register every installed app *before the first
   render* — a restored window resolves its app on the first pass or paints as
@@ -549,6 +557,20 @@ build step, using `bw.fs`, `bw.setTitle`, `bw.alert` and the opened document.
 It is also where the two things a sandboxed frame *cannot* do are visible:
 there is no `allow-modals`, so `prompt()` and `confirm()` are blocked and it
 draws its own sheets, and `connect-src 'none'` means a `fetch` never leaves.
+
+`node pkgs/build.mjs init <dir>` scaffolds a new one, and what it writes
+**already builds, installs and runs** — a working package to change, not a
+stub with holes. That is the only kind of scaffold that stays true: the suite
+inits one, builds it and reads it back through the Installer's own reader, so
+a format change that breaks the starting point fails in CI. The templates are
+strings in `pkgs/init.mjs` rather than a `template/` directory, because a
+directory of templates inside `pkgs/` would itself be built by the bare
+`build.mjs` and published by the Packages workflow. The default id is
+`com.example.<dir>`, a placeholder that reads as one: the id is the install
+key and is fixed for the life of the package. A build argument is a directory
+in `pkgs/` *or a path to one anywhere*, and `--dist` redirects the output —
+which is what keeps the test's scaffolding out of the artifact the workflow
+uploads.
 
 ## Design system
 

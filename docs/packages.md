@@ -44,8 +44,8 @@ beanpaint.pkg
 for the life of the package: changing it publishes a different app rather than
 an update.
 
-An unknown `permissions` entry is a warning, not an error — it is simply not
-granted, so a package built against a later BeanWeb still runs with less.
+`permissions` is the one field the user is asked about before anything is
+installed. **Permissions**, below, is what the entries mean.
 
 ## Limits
 
@@ -64,6 +64,88 @@ IndexedDB, and `parent.localStorage` throws. The frame's document also carries
 it is allowed to read.
 
 The entry script runs at the end of `<body>`, so `document.body` exists.
+
+## Permissions
+
+`permissions` is what a package asks the host to do on its behalf. It is
+declared in the manifest rather than requested at runtime so that the whole ask
+can be shown to the user *before* the package is on their disk.
+
+| Permission | What the user is told |
+|---|---|
+| `fs` | Read and write files in its own folder |
+
+That is the entire list today.
+
+A permission is not what keeps a package honest. The sandbox and the CSP are,
+and they hold whether or not the manifest is truthful — a package that omits
+`fs` and calls `bw.fs.read` anyway is refused just the same. What a permission
+does is two narrower things: it is the sentence the user agrees to, and it is
+the switch the bridge checks before it will answer a verb at all.
+
+### Granted without asking
+
+`ready`, `setTitle`, `close` and `alert` need no permission, and a package that
+declares none still gets all four. None of them reaches anything of the user's:
+they report what the host already told the guest, retitle or close the guest's
+own window, or draw a modal the user answers themselves.
+
+There is no permission for the network, and there is not going to be one. The
+guest document carries `connect-src 'none'` and no verb proxies a request, so
+*may this app go online* is not a question this format can ask.
+
+### What `fs` grants
+
+The four `bw.fs.*` calls, and nothing else. It is checked in
+`lib/packages/bridge.ts` before the verb is dispatched, so a package without it
+gets a rejected promise rather than a partial write. It also decides whether
+`/boot/home/packages/<id>/` is created at all: a package that cannot write does
+not leave an empty folder behind.
+
+`fs` says *whether*, never *where*. The scope is fixed by the host and enforced
+separately, by resolving every path the guest names and comparing it against:
+
+- `/boot/home/packages/<id>/` — the package's own folder, and
+- the one document the window was opened on, if there is one.
+
+Nothing widens that. A package that wants `/boot/home/documents` cannot ask for
+it: there is no wording for it in the manifest, and `resolveForPackage` would
+refuse the path even if there were. Which is why the table above says *its own
+folder* — the label is the promise, and the promise is the whole grant.
+
+### Unknown entries
+
+An unknown permission is a **warning, not an error**. It is simply not granted,
+so a package built against a later BeanWeb installs and runs with less rather
+than not at all — the forward-compatible direction, because the failure is the
+safe one. It is also left out of the list shown to the user: a line naming
+access that was never granted would be worse than no line.
+
+### How it reaches the user
+
+Installing raises a confirmation naming the package, its publisher and every
+permission it asks for, as *It will be able to…* — or *It has asked for no
+special access*, which is a thing worth saying out loud. Cancel is a real
+answer; nothing is written until Install is pressed.
+
+After that the Installer's detail pane carries the same list under **Access**,
+so the ask is answerable later and not only in the moment. Installing over an
+existing package re-asks with the *new* manifest's list, so a version that
+wants more has to be agreed to again.
+
+### Adding one
+
+1. `Permission`, `PERMISSIONS` and `PERMISSION_LABELS` in
+   `lib/packages/types.ts`. The label is the security-relevant part: it is the
+   whole of what the user knows about the grant, so it has to describe the
+   scope the bridge actually enforces, not the verb's name.
+2. The gate in `lib/packages/bridge.ts`, as a set of verbs checked before the
+   dispatch — `FS_VERBS` is the pattern. Refuse at the door, so a half-done
+   operation is not a state the host can be left in.
+3. A row in the table above.
+
+Older BeanWebs will treat it as an unknown entry and not grant it, which is the
+behaviour that makes adding one safe.
 
 ## The `bw` API
 
@@ -127,6 +209,22 @@ else has to change.
 
 Not addressed here, and needed before a store is trustworthy: **signing**.
 `publisher` is an unverified string today.
+
+## Starting one
+
+```bash
+node pkgs/build.mjs init bean-paint --name "Bean Paint" --ext .bpaint
+node pkgs/build.mjs bean-paint
+```
+
+The first writes a package directory — manifest, entry script and icon — that
+already builds and runs; the second packs it into `pkgs/dist/<id>.pkg`. Set
+your own `id` before publishing: the default is a `com.example.` placeholder,
+and the id is the install key. `pkgs/README.md` has the options.
+
+Neither command is part of BeanWeb — `pkgs/build.mjs` imports nothing from
+`src/`, so a package it scaffolds can live in its own repository and build
+there with a copy of the script.
 
 ## A worked example
 
