@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import Anthropic from '@anthropic-ai/sdk'
+import type Anthropic from '@anthropic-ai/sdk'
 import { MenuBar } from '@/widgets/Menu'
 import type { MenuDef } from '@/widgets/Menu'
 import { Button, ScrollView } from '@/widgets/controls'
@@ -17,6 +17,30 @@ import { useCloseGuard } from '@/lib/closeGuards'
 import { registerApp } from './registry'
 import type { AppProps } from './registry'
 import './claude.css'
+
+/**
+ * The SDK is fetched the first time this app talks to the API, not at boot.
+ *
+ * It is by far the heaviest dependency here and the only one no other app
+ * touches, so importing it statically put a quarter of the bundle in front of
+ * every desktop that never opens Claude. Same division the packages store
+ * draws between an index and a payload: what the first render needs is loaded
+ * synchronously, the rest arrives when something asks for it.
+ *
+ * Memoise the module, never the failure to fetch it -- `lib/keystore.ts`'s
+ * rule. A cached rejection would wedge the app for the life of the tab after
+ * one dropped connection.
+ */
+type SDK = typeof import('@anthropic-ai/sdk')
+let sdkPromise: Promise<SDK> | null = null
+
+function loadSDK(): Promise<SDK> {
+  sdkPromise ??= import('@anthropic-ai/sdk').catch((err) => {
+    sdkPromise = null
+    throw err
+  })
+  return sdkPromise
+}
 
 /** Ceiling we ask for; clamped down to whatever the chosen model allows. */
 const DESIRED_MAX_TOKENS = 64000
@@ -142,16 +166,19 @@ export function Claude({ windowId }: AppProps) {
 
   const reportError = useCallback(
     async (err: unknown) => {
+      // Every path that can raise has already loaded the SDK, so this resolves
+      // from the memo; awaiting it is how the classes are in hand at all.
+      const sdk = await loadSDK()
       // Typed classes, most specific first -- never string-match messages.
-      if (err instanceof Anthropic.AuthenticationError) {
+      if (err instanceof sdk.AuthenticationError) {
         await showAlert(
           'stop',
           'Claude',
           'The API key was rejected (401).\nCheck it under Settings → Set API key.',
         )
-      } else if (err instanceof Anthropic.RateLimitError) {
+      } else if (err instanceof sdk.RateLimitError) {
         await showAlert('warn', 'Claude', 'Rate limited (429).\nWait a moment and try again.')
-      } else if (err instanceof Anthropic.APIError) {
+      } else if (err instanceof sdk.APIError) {
         await showAlert('stop', 'Claude', `API error ${err.status}.\n${err.message}`)
       } else {
         await showAlert('stop', 'Claude', String((err as Error)?.message ?? err))
@@ -175,7 +202,8 @@ export function Claude({ windowId }: AppProps) {
       pollingRef.current = true
       setPolling(true)
       try {
-        const client = new Anthropic({ apiKey: key, dangerouslyAllowBrowser: true })
+        const { default: SDKClient } = await loadSDK()
+        const client = new SDKClient({ apiKey: key, dangerouslyAllowBrowser: true })
         const found: ModelOption[] = []
         // list() auto-paginates.
         for await (const info of client.models.list({ limit: 50 })) {
@@ -224,7 +252,8 @@ export function Claude({ windowId }: AppProps) {
     setStreaming(true)
 
     try {
-      const client = new Anthropic({ apiKey: key, dangerouslyAllowBrowser: true })
+      const { default: SDKClient } = await loadSDK()
+      const client = new SDKClient({ apiKey: key, dangerouslyAllowBrowser: true })
       const stream = client.messages
         .stream({
           model,
@@ -251,8 +280,9 @@ export function Claude({ windowId }: AppProps) {
       setUsage(`${final.usage.input_tokens} in / ${final.usage.output_tokens} out`)
     } catch (err) {
       // An abort is a normal outcome: keep whatever streamed in.
+      const { APIUserAbortError } = await loadSDK()
       const aborted =
-        (err as Error)?.name === 'AbortError' || err instanceof Anthropic.APIUserAbortError
+        (err as Error)?.name === 'AbortError' || err instanceof APIUserAbortError
       if (aborted) {
         historyRef.current = [
           ...historyRef.current,
