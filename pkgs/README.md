@@ -18,6 +18,21 @@ Installer's *File → Install from this computer…*.
 
 `docs/packages.md` is the format and the `bw` API.
 
+## CI
+
+`.github/workflows/packages.yml` builds these on any change to `pkgs/` or to
+`src/lib/packages/` — the format itself, because a change there can make a
+package that built yesterday unreadable — and on demand from the Actions tab.
+
+It attaches a **packages** artifact holding every `.pkg`, a `SHA256SUMS` and a
+`packages.json` manifest. The build is verified by reading each archive back
+through the Installer's own reader, so what you download is known to install
+and not merely known to exist. Checksums are taken last, after the step that
+rebuilds them, which the byte-stable build is what makes meaningful.
+
+`node pkgs/build.mjs --json` is what the workflow uses: one JSON array on
+stdout and nothing else, with failures on stderr and a non-zero exit.
+
 ## iconedit
 
 **IconEdit** — a pixel editor for icons on the same 32-unit grid BeanWeb draws

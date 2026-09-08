@@ -1,0 +1,108 @@
+name: Packages
+
+# Packages are not part of the app bundle -- they are installed into it -- so
+# they are built here rather than in `pr.yml`, and the .pkg files come out as a
+# downloadable artifact. `pr.yml` still runs the whole suite, which includes
+# `tests/pkgs.test.ts`; this workflow is what produces something to install.
+#
+# The two `paths` lists are duplicated rather than shared through a YAML
+# anchor: anchors are not documented as supported in workflow files, and a
+# parse failure here would take the whole workflow out.
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'pkgs/**'
+      # The format lives here. A change to it can make a package that built
+      # yesterday unreadable, so rebuild and re-verify when it moves.
+      - 'src/lib/packages/**'
+      - '.github/workflows/packages.yml'
+      - 'package-lock.json'
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - 'pkgs/**'
+      - 'src/lib/packages/**'
+      - '.github/workflows/packages.yml'
+      - 'package-lock.json'
+  workflow_dispatch:
+
+concurrency:
+  group: pkgs-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build packages
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Install dependencies
+        run: |
+          npm config set audit false
+          npm config set fund false
+          npm ci
+
+      # One build, which also writes the manifest that goes in the artifact.
+      # `mkdir` first because the redirect opens the file before the build has
+      # made the directory. Doing the manifest as a second `--json` run instead
+      # would rebuild the .pkg files, and anything rebuilt after the checksums
+      # below would make them a claim about a file that no longer exists.
+      - name: Build packages
+        run: |
+          mkdir -p pkgs/dist
+          node pkgs/build.mjs --json > pkgs/dist/packages.json
+          cat pkgs/dist/packages.json
+
+      # Reads every .pkg back through the same reader the Installer uses, so
+      # the artifact is known to install rather than merely known to exist.
+      # This does rebuild them -- and asserts the rebuild is byte-identical,
+      # which is what lets the checksums below be taken afterwards at all.
+      - name: Verify they are installable
+        run: npx vitest run tests/pkgs.test.ts
+
+      # Last thing to touch the files, so the sums describe what ships.
+      - name: Checksums
+        working-directory: pkgs/dist
+        run: sha256sum *.pkg | tee SHA256SUMS
+
+      - name: Summary
+        run: |
+          {
+            echo '### Packages'
+            echo
+            echo '| Package | Id | Version | Size |'
+            echo '|---|---|---|---|'
+            jq -r '.[] | "| \(.name) | `\(.id)` | \(.version) | \(.bytes / 1024 * 10 | round / 10) KB |"' \
+              pkgs/dist/packages.json
+            echo
+            echo 'Download the **packages** artifact below, then install a `.pkg`'
+            echo 'from the Installer: *File -> Install from this computer…*'
+            echo
+            echo '<details><summary>SHA-256</summary>'
+            echo
+            echo '```'
+            cat pkgs/dist/SHA256SUMS
+            echo '```'
+            echo
+            echo '</details>'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload packages
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # 7.0.1
+        with:
+          name: packages
+          path: pkgs/dist
+          if-no-files-found: error
+          retention-days: 30

@@ -16,8 +16,9 @@ npm test           # vitest run  (580 tests)
 npm run test:watch # vitest, watch mode
 ```
 
-CI runs typecheck -> test -> build on every PR
-(`.github/workflows/ci.yml`).
+CI runs typecheck -> test -> build on every PR (`.github/workflows/pr.yml`),
+and `.github/workflows/packages.yml` builds `pkgs/` into an installable
+**packages** artifact when the packages or the format change.
 
 ## Testing
 

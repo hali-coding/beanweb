@@ -9,6 +9,7 @@
  *
  *   node pkgs/build.mjs              # every directory in pkgs/
  *   node pkgs/build.mjs iconedit     # just that one
+ *   node pkgs/build.mjs --json       # machine-readable, nothing else on stdout
  *
  * Output goes to pkgs/dist/<id>.pkg.
  */
@@ -83,8 +84,13 @@ function build(name) {
 }
 
 function main(argv) {
-  const wanted = argv.length
-    ? argv
+  // --json prints one JSON array and nothing else, so a caller (the Packages
+  // workflow) can build a summary from data rather than parsing log lines.
+  const json = argv.includes('--json')
+  const names = argv.filter((a) => a !== '--json')
+
+  const wanted = names.length
+    ? names
     : readdirSync(HERE, { withFileTypes: true })
         .filter((e) => e.isDirectory() && !IGNORE.has(e.name) && !e.name.startsWith('.'))
         .map((e) => e.name)
@@ -94,18 +100,37 @@ function main(argv) {
     return 1
   }
 
+  const built = []
   let failed = 0
   for (const name of wanted) {
     try {
-      const { manifest, out, bytes, names } = build(name)
-      const kb = (bytes.byteLength / 1024).toFixed(1)
-      console.log(
-        `${manifest.name} ${manifest.version} -> ${relative(process.cwd(), out)}  ` +
-          `(${kb} KB, ${names.length} files)`,
-      )
+      const { manifest, out, bytes, names: files } = build(name)
+      built.push({
+        dir: name,
+        id: manifest.id,
+        name: manifest.name,
+        version: manifest.version,
+        // Both, because they differ where it matters: `file` is where the
+        // build put it, `filename` is what it is called inside the Packages
+        // workflow's artifact, which uploads the contents of pkgs/dist.
+        file: relative(process.cwd(), out).split('\\').join('/'),
+        filename: `${manifest.id}.pkg`,
+        bytes: bytes.byteLength,
+        files: files.length,
+      })
     } catch (err) {
+      // Always to stderr, so --json's stdout stays parseable even on failure.
       console.error(`FAIL ${name}: ${err.message}`)
       failed++
+    }
+  }
+
+  if (json) console.log(JSON.stringify(built, null, 2))
+  else {
+    for (const b of built) {
+      console.log(
+        `${b.name} ${b.version} -> ${b.file}  (${(b.bytes / 1024).toFixed(1)} KB, ${b.files} files)`,
+      )
     }
   }
   return failed ? 1 : 0
