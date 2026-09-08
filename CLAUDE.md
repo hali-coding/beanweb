@@ -693,6 +693,17 @@ because the project has no backend to proxy through.
   Acceptable for a local desktop toy, the case the Anthropic docs sanction, and
   **not** acceptable for a public deploy. If this is ever hosted, the app needs
   a server-side proxy first.
+- **The SDK is imported dynamically, and it is the only code-split in the
+  build.** It is the heaviest dependency here and the one no other app touches,
+  so a static import put a quarter of the bundle in front of every desktop that
+  never opens Claude; `loadSDK()` fetches it on the first call to the API and
+  the entry chunk drops from 614 kB to 451 kB. Memoise the module, never the
+  failure to fetch it -- `lib/keystore.ts`'s rule, and a cached rejection would
+  wedge the app for the life of the tab after one dropped connection. Everything
+  that touches the SDK at runtime is already async, error branches included, so
+  awaiting the memo costs a microtask and nothing else. Note that no test covers
+  this: `tests/claude.test.tsx` mocks the module, so the real import path only
+  ever runs in a browser.
 - Stream (`client.messages.stream`) and resend the **full**
   `Anthropic.MessageParam[]` history every turn — the API is stateless. Do not
   use assistant prefill; it returns 400 on the 4.6+ family.
