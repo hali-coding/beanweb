@@ -4,6 +4,7 @@ import {
   createBridge,
   isGuestMessage,
   packageRoot,
+  resolveForPackage,
   resolveInPackage,
   type BridgeHost,
 } from '@/lib/packages/bridge'
@@ -39,9 +40,9 @@ function fakeHost(): BridgeHost & { calls: string[] } {
   }
 }
 
-const bridge = (permissions: Permission[] = ['fs']) => {
+const bridge = (permissions: Permission[] = ['fs'], openPath?: string) => {
   const host = fakeHost()
-  return { host, handle: createBridge({ pkgId: PKG, permissions }, host) }
+  return { host, handle: createBridge({ pkgId: PKG, permissions, openPath }, host) }
 }
 
 describe('the package path jail', () => {
@@ -69,11 +70,63 @@ describe('the package path jail', () => {
   })
 })
 
+describe('the opened document', () => {
+  const DOC = '/boot/home/documents/logo.bicon'
+  const ctx = { pkgId: PKG, permissions: ['fs'] as Permission[], openPath: DOC }
+
+  it('is reachable by its exact path, though it is outside the folder', () => {
+    expect(resolveInPackage(PKG, DOC)).toBeNull()
+    expect(resolveForPackage(ctx, DOC)).toBe(DOC)
+  })
+
+  it('grants nothing else in the folder it happens to live in', () => {
+    expect(resolveForPackage(ctx, '/boot/home/documents/secret.txt')).toBeNull()
+    expect(resolveForPackage(ctx, '/boot/home/documents')).toBeNull()
+    // No relative route to it either.
+    expect(resolveForPackage(ctx, '../../documents/logo.bicon')).toBeNull()
+  })
+
+  it('grants nothing at all when the window was not opened on one', () => {
+    expect(resolveForPackage({ pkgId: PKG, permissions: ['fs'] }, DOC)).toBeNull()
+  })
+
+  it('is reported by ready, so the guest knows to load it', async () => {
+    const { handle } = bridge(['fs'], DOC)
+    const reply = await handle({ id: 1, verb: 'ready' })
+    expect(reply.value).toEqual({ pkgId: PKG, root: packageRoot(PKG), path: DOC })
+  })
+
+  it('is null on ready when there is none', async () => {
+    const { handle } = bridge()
+    expect((await handle({ id: 1, verb: 'ready' })).value).toMatchObject({ path: null })
+  })
+
+  it('can be read and written but not deleted', async () => {
+    const { handle, host } = bridge(['fs'], DOC)
+    expect((await handle({ id: 2, verb: 'fs.read', path: DOC })).ok).toBe(true)
+    expect((await handle({ id: 3, verb: 'fs.write', path: DOC, content: 'x' })).ok).toBe(true)
+
+    const removed = await handle({ id: 4, verb: 'fs.remove', path: DOC })
+    expect(removed.ok).toBe(false)
+    expect(removed.error).toMatch(/Cannot remove the opened document/)
+    expect(host.calls).toEqual([`read:${DOC}`, `write:${DOC}:x`])
+  })
+
+  it('still needs the fs permission', async () => {
+    const { handle } = bridge([], DOC)
+    expect((await handle({ id: 5, verb: 'fs.read', path: DOC })).ok).toBe(false)
+  })
+})
+
 describe('the bridge', () => {
   it('answers ready with the package root', async () => {
     const { handle } = bridge()
     const reply = await handle({ id: 1, verb: 'ready' })
-    expect(reply).toEqual({ id: 1, ok: true, value: { pkgId: PKG, root: packageRoot(PKG) } })
+    expect(reply).toEqual({
+      id: 1,
+      ok: true,
+      value: { pkgId: PKG, root: packageRoot(PKG), path: null },
+    })
   })
 
   it('refuses a verb it does not know', async () => {

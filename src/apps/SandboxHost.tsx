@@ -24,7 +24,7 @@ import type { AppProps } from './registry'
  * The guest also carries its own CSP (see `lib/packages/document.ts`), which is
  * what stops it sending anywhere what the `fs` permission lets it read.
  */
-export function SandboxHost({ windowId, pkgId }: AppProps & { pkgId: string }) {
+export function SandboxHost({ windowId, args, pkgId }: AppProps & { pkgId: string }) {
   const frame = useRef<HTMLIFrameElement>(null)
   const [doc, setDoc] = useState<string | null>(null)
 
@@ -87,7 +87,10 @@ export function SandboxHost({ windowId, pkgId }: AppProps & { pkgId: string }) {
       removeFile: (path) => useFs.getState().remove(path),
     }
 
-    const handle = createBridge({ pkgId, permissions: manifest.permissions }, host)
+    const handle = createBridge(
+      { pkgId, permissions: manifest.permissions, openPath: args?.path },
+      host,
+    )
 
     const onMessage = (event: MessageEvent) => {
       if (event.source !== frame.current?.contentWindow) return
@@ -99,7 +102,7 @@ export function SandboxHost({ windowId, pkgId }: AppProps & { pkgId: string }) {
 
     window.addEventListener('message', onMessage)
     return () => window.removeEventListener('message', onMessage)
-  }, [pkgId, manifest, windowId])
+  }, [pkgId, manifest, windowId, args?.path])
 
   if (!manifest) {
     return <div className="sandbox sandbox--empty">This package is no longer installed.</div>

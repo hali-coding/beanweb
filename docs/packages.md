@@ -70,7 +70,7 @@ The entry script runs at the end of `<body>`, so `document.body` exists.
 Every call returns a promise. Rejection carries the host's reason.
 
 ```js
-await bw.ready()                       // { pkgId, root }
+await bw.ready()                       // { pkgId, root, path }
 await bw.setTitle('Untitled 1')        // the window tab; trimmed to 64 chars
 await bw.close()                       // asks the window to close
 await bw.alert(text, kind, buttons)    // kind: 'info' | 'warn' | 'stop'
@@ -89,6 +89,21 @@ await bw.fs.remove(path)               // boolean
 Paths are resolved inside the package folder and refused if they land anywhere
 else, so `../` buys nothing. The folder itself cannot be removed. A package's
 documents survive uninstalling it.
+
+### The opened document
+
+A package that claims an `extensions` entry is launched with the file the user
+double-clicked in Tracker. `bw.ready()` reports it as `path`, and that one file
+is readable and writable even though it is outside the package folder — the
+double-click is the consent, the same way choosing a file from a panel is.
+
+It is the *only* exception, and it is narrow: the path must be named exactly,
+there is no relative route to it, nothing else in its directory is reachable,
+and it cannot be deleted. Opening a document in an editor grants editing it,
+not throwing it away.
+
+`path` is `null` when the window was not opened on a document. The value comes
+from the host, never from the guest — no verb here opens a window.
 
 ## Adding a source
 
@@ -112,3 +127,8 @@ else has to change.
 
 Not addressed here, and needed before a store is trustworthy: **signing**.
 `publisher` is an unverified string today.
+
+## A worked example
+
+`pkgs/iconedit` is a complete package — a pixel editor for icons — with its own
+standalone build script that imports nothing from `src/`. See `pkgs/README.md`.

@@ -41,6 +41,16 @@ export interface BridgeHost {
 export interface BridgeContext {
   pkgId: string
   permissions: readonly Permission[]
+  /**
+   * The document the window was launched on, when a package claims the file
+   * type -- Tracker passes it as the window's `args.path`.
+   *
+   * It comes from the host, never from the guest: nothing a package can say
+   * reaches this field, and no bridge verb opens a window. So it is exactly
+   * the file the user double-clicked, and that double-click is the consent --
+   * the same shape as picking a file from a panel.
+   */
+  openPath?: string
 }
 
 export interface GuestMessage {
@@ -78,6 +88,20 @@ export function resolveInPackage(pkgId: string, path: unknown): string | null {
   return resolved
 }
 
+/**
+ * A guest path, resolved to somewhere the package is allowed to touch.
+ *
+ * That is its own folder, plus the one document it was opened on. The document
+ * has to be named exactly -- there is no relative route to it -- so a package
+ * cannot go looking for its neighbours in the folder it happens to sit in.
+ */
+export function resolveForPackage(ctx: BridgeContext, path: unknown): string | null {
+  const inside = resolveInPackage(ctx.pkgId, path)
+  if (inside) return inside
+  if (ctx.openPath && path === ctx.openPath) return ctx.openPath
+  return null
+}
+
 const FS_VERBS = new Set(['fs.read', 'fs.write', 'fs.list', 'fs.remove'])
 
 const str = (v: unknown): string | null => (typeof v === 'string' ? v : null)
@@ -103,7 +127,15 @@ export function createBridge(ctx: BridgeContext, host: BridgeHost) {
     try {
       switch (verb) {
         case 'ready':
-          return { id, ok: true, value: { pkgId: ctx.pkgId, root: packageRoot(ctx.pkgId) } }
+          return {
+            id,
+            ok: true,
+            value: {
+              pkgId: ctx.pkgId,
+              root: packageRoot(ctx.pkgId),
+              path: ctx.openPath ?? null,
+            },
+          }
 
         case 'setTitle': {
           const title = str(message.title)
@@ -131,13 +163,13 @@ export function createBridge(ctx: BridgeContext, host: BridgeHost) {
         }
 
         case 'fs.read': {
-          const path = resolveInPackage(ctx.pkgId, message.path)
+          const path = resolveForPackage(ctx, message.path)
           if (!path) return denied(id, 'That path is outside the package folder.')
           return { id, ok: true, value: host.readFile(path) ?? null }
         }
 
         case 'fs.write': {
-          const path = resolveInPackage(ctx.pkgId, message.path)
+          const path = resolveForPackage(ctx, message.path)
           if (!path) return denied(id, 'That path is outside the package folder.')
           const content = str(message.content)
           if (content === null) return denied(id, 'fs.write needs a string.')
@@ -146,16 +178,19 @@ export function createBridge(ctx: BridgeContext, host: BridgeHost) {
         }
 
         case 'fs.list': {
-          const path = resolveInPackage(ctx.pkgId, message.path ?? '.')
+          const path = resolveForPackage(ctx, message.path ?? '.')
           if (!path) return denied(id, 'That path is outside the package folder.')
           return { id, ok: true, value: host.listDir(path) }
         }
 
         case 'fs.remove': {
-          const path = resolveInPackage(ctx.pkgId, message.path)
+          const path = resolveForPackage(ctx, message.path)
           if (!path) return denied(id, 'That path is outside the package folder.')
-          // The folder itself is not the guest's to delete.
+          // The folder itself is not the guest's to delete, and neither is the
+          // document it was opened on: opening a file in an editor grants
+          // editing it, which is not the same as throwing it away.
           if (path === packageRoot(ctx.pkgId)) return denied(id, 'Cannot remove the package folder.')
+          if (path === ctx.openPath) return denied(id, 'Cannot remove the opened document.')
           return { id, ok: true, value: host.removeFile(path) }
         }
 

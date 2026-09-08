@@ -10,3 +10,6 @@ IDEAS.md
 
 # driver screenshots
 .claude/skills/run-beanweb/shots/
+
+# Built packages -- pkgs/ holds the sources, `npm run build:pkgs` makes these.
+pkgs/dist/

@@ -10,8 +10,9 @@ filesystem, shell, and window manager all run in the tab.
 npm run dev        # Vite dev server with HMR
 npm run build      # tsc -b && vite build  -> dist/
 npm run preview    # serve the production build
+npm run build:pkgs # pack pkgs/* into installable .pkg files
 npm run typecheck  # types only
-npm test           # vitest run  (569 tests)
+npm test           # vitest run  (580 tests)
 npm run test:watch # vitest, watch mode
 ```
 
@@ -510,6 +511,14 @@ protocol inside the jsdom suite.
   reads from the host and unpacks), and any defence against a package merely
   wasting CPU in its own frame.
 
+- **A package claiming a file type gets that one file, and nothing else near
+  it.** Tracker launches it with the document as `args.path`; the bridge
+  reports it from `ready` and allows exactly that path outside the package
+  folder. The double-click is the consent, the same as choosing a file from a
+  panel. It has to be named exactly — no relative route, no listing the
+  directory it sits in, no deleting it. The field comes from the host: no verb
+  a guest can send opens a window, so it cannot forge one.
+
 ### Adding a file type
 
 `AppDef.extensions` claims one — `['.bas']` on BASIC, `['.svg']` on Draw, and
@@ -517,6 +526,21 @@ whatever an installed package declares. Tracker's open chain and Terminal's
 `open` both route through `appForFile`, falling back to StyledEdit. Terminal's
 `edit`/`basic`/`draw` verbs stay as they are: those name an application on
 purpose and will create an empty file to open.
+
+### pkgs/
+
+`pkgs/` holds package *sources* and is not part of the app: nothing in `src/`
+imports it and `pkgs/build.mjs` imports nothing from `src/`, so a package could
+move to its own repository unchanged. That independence is the check that the
+format is really a format, and `tests/pkgs.test.ts` runs the build and reads
+the result back through the Installer's own reader so it cannot quietly stop
+being installable.
+
+`pkgs/iconedit` is the worked example — a pixel editor in plain ES2020 with no
+build step, using `bw.fs`, `bw.setTitle`, `bw.alert` and the opened document.
+It is also where the two things a sandboxed frame *cannot* do are visible:
+there is no `allow-modals`, so `prompt()` and `confirm()` are blocked and it
+draws its own sheets, and `connect-src 'none'` means a `fetch` never leaves.
 
 ## Design system
 
