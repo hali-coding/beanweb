@@ -229,6 +229,7 @@ function seed(): Record<string, FsNode> {
     app('/boot/apps/BeanChallenge', 'beanchallenge'),
     app('/boot/apps/BASIC', 'basic'),
     app('/boot/apps/Claude', 'claude'),
+    app('/boot/apps/Installer', 'installer'),
   ]
   return Object.fromEntries(nodes.map((n) => [n.path, n]))
 }
@@ -265,6 +266,8 @@ interface FsStore {
   read: (path: string) => string | undefined
   write: (path: string, content: string) => void
   mkdir: (path: string) => boolean
+  /** Create an application stub. `write` only ever makes text nodes. */
+  mkapp: (path: string, appId: string) => boolean
   remove: (path: string) => boolean
   rename: (path: string, name: string) => boolean
   exists: (path: string) => boolean
@@ -303,6 +306,16 @@ export const useFs = create<FsStore>((set, get) => ({
     if (get().nodes[path]) return false
     set((s) => {
       const nodes = { ...s.nodes, [path]: dir(path) }
+      persist(nodes)
+      return { nodes }
+    })
+    return true
+  },
+
+  mkapp: (path, appId) => {
+    if (get().nodes[path]) return false
+    set((s) => {
+      const nodes = { ...s.nodes, [path]: app(path, appId) }
       persist(nodes)
       return { nodes }
     })

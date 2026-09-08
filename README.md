@@ -34,6 +34,10 @@ npm test         # vitest + jsdom
 - **Tetris** — 7-bag randomiser, wall kicks, a landing shadow you can switch
   off, and the classic tetromino palette muted a shade to sit against R5 grey.
   Touch pad on phones.
+- **Installer** — install applications of your own from a `.pkg` file. They run
+  in a sandboxed iframe on an opaque origin, so a package cannot reach the
+  desktop's storage or your API key, and its own CSP stops it calling home. See
+  [docs/packages.md](docs/packages.md) for the format.
 - **Claude** — a bare-bones chat client: streaming replies, stop mid-answer,
   multi-turn history, and a **Model** menu listing what your key can actually
   reach, priced and sorted cheapest first. Defaults to the cheapest model.

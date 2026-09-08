@@ -517,4 +517,5 @@ registerApp({
   defaultH: 520,
   minW: 340,
   minH: 320,
+  extensions: ['.bas'],
 })

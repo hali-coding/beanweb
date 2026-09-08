@@ -7,7 +7,7 @@ import type { FsNode } from '@/store/fs'
 import { basename, dirname, joinPath, useFs } from '@/store/fs'
 import { useDesktop } from '@/store/desktop'
 import { exportNode, importFiles, importFromHost } from '@/lib/transfer'
-import { getApp, launchApp, registerApp } from './registry'
+import { appForFile, getApp, launchApp, registerApp } from './registry'
 import type { AppProps } from './registry'
 import './tracker.css'
 
@@ -78,14 +78,12 @@ export function Tracker({ windowId, args }: AppProps) {
         navigate(node.path)
       } else if (node.kind === 'app' && node.appId) {
         launchApp(node.appId)
-      } else if (node.name.toLowerCase().endsWith('.bas')) {
-        // Programs open in the interpreter, drawings in Draw, the rest in the
-        // editor.
-        launchApp('basic', { path: node.path }, node.name)
-      } else if (node.name.toLowerCase().endsWith('.svg')) {
-        launchApp('draw', { path: node.path }, node.name)
       } else {
-        launchApp('styledit', { path: node.path }, node.name)
+        // Whichever app claims the extension -- `.bas` the interpreter, `.svg`
+        // Draw, and whatever an installed package registered. Anything
+        // unclaimed is text, and opens in the editor.
+        const app = appForFile(node.name)
+        launchApp(app?.id ?? 'styledit', { path: node.path }, node.name)
       }
     },
     [navigate],
