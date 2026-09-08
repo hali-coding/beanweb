@@ -68,7 +68,14 @@ export interface PackageManifest {
   /** Path within the archive of the script the sandbox loads. */
   entry: string
   publisher?: string
+  /** One line, shown wherever a listing is compact -- a table row's neighbour. */
   summary?: string
+  /**
+   * The longer pitch, shown only in the detail pane where there is room for
+   * it. Free-form and may hold its own line breaks; unlike `summary` it is
+   * not meant to fit in one line.
+   */
+  description?: string
   /** Path within the archive of an SVG icon on the usual 32-unit grid. */
   icon?: string
   window: PackageWindow
@@ -97,7 +104,7 @@ export const MAX_ICON_BYTES = 16 * 1024
 export interface InstalledPackage {
   manifest: PackageManifest
   installedAt: number
-  /** Which `PackageSource` it came from, for the Installer's listing. */
+  /** Which `PackageSource` it came from, for Coffee Shop's *Installed* listing. */
   sourceId: string
   sizeBytes: number
   /**

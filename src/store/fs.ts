@@ -229,7 +229,7 @@ function seed(): Record<string, FsNode> {
     app('/boot/apps/BeanChallenge', 'beanchallenge'),
     app('/boot/apps/BASIC', 'basic'),
     app('/boot/apps/Claude', 'claude'),
-    app('/boot/apps/Installer', 'installer'),
+    app('/boot/apps/Coffee Shop', 'coffeeshop'),
   ]
   return Object.fromEntries(nodes.map((n) => [n.path, n]))
 }

@@ -7,6 +7,7 @@ import { useFs } from '@/store/fs'
 import { packagesReady, readPayload, usePackages } from '@/store/packages'
 import { useDesktop } from '@/store/desktop'
 import type { AppProps } from './registry'
+import './sandboxhost.css'
 
 /**
  * The window an installed package runs in.

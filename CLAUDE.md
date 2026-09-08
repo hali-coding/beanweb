@@ -437,8 +437,9 @@ so *File → Export SVG…* can hand the browser a drawing that is not on the di
 
 A user can install an application. A **package** is a zip named `.pkg` — R5's
 own installer extension — holding a `manifest.json`, an entry script and an
-optional icon; `apps/Installer.tsx` lists what is installed and installs more.
-`docs/packages.md` is the format, written for whoever builds a store.
+optional icon; `apps/CoffeeShop.tsx` lists what is installed and installs
+more — see **Coffee Shop**, below, for that app. `docs/packages.md` is the
+format, written for whoever builds a store.
 
 `lib/packages/` is pure data with no DOM, like `lib/draw/` and
 `lib/basic/screen.ts`, which is what puts the format and the whole sandbox
@@ -498,7 +499,7 @@ protocol inside the jsdom suite.
   update depth exceeded" — the `useShallow` failure again. Build it in
   `emit()`. The Deskbar's menu used to be memoised on a stable action and so
   was computed once per mount; an app installed afterwards could never appear
-  in it, and `tests/installer.test.tsx` keeps that honest.
+  in it, and `tests/packages-install.test.tsx` keeps that honest.
 - **`readPackage` and `writePackage` are exact inverses and byte-stable**, the
   contract `toSVG`/`parseSVG` and `formatLevel`/`parseLevel` hold. Entry mtimes
   are pinned to a *locally constructed* 1980 date: fflate encodes the DOS
@@ -513,9 +514,10 @@ protocol inside the jsdom suite.
   could have written in its entry file anyway.
 - **`installPackage` takes bytes, not a `File`.** That plus `PackageSource`'s
   two methods is the entire app-store seam: a store is a second source and
-  nothing below it changes. One source ships (`UploadSource`), and the
-  Installer renders from `listSources()` even though there is one, or the seam
-  is untested and will not fit when the store arrives.
+  nothing below it changes. Coffee Shop renders every non-browsable source
+  from `listSources()` as its own *File* menu item even though `UploadSource`
+  is the only one, or the seam is untested and will not fit when a second one
+  arrives.
 - **The payload is written before the package is recorded.** A browser that
   cannot store files installs nothing, rather than leaving a menu entry that
   opens an empty window for the life of the profile.
@@ -549,7 +551,7 @@ purpose and will create an empty file to open.
 imports it and `pkgs/build.mjs` imports nothing from `src/`, so a package could
 move to its own repository unchanged. That independence is the check that the
 format is really a format, and `tests/pkgs.test.ts` runs the build and reads
-the result back through the Installer's own reader so it cannot quietly stop
+the result back through Coffee Shop's own reader so it cannot quietly stop
 being installable.
 
 `pkgs/iconedit` is the worked example — a pixel editor in plain ES2020 with no
@@ -561,8 +563,8 @@ draws its own sheets, and `connect-src 'none'` means a `fetch` never leaves.
 `node pkgs/build.mjs init <dir>` scaffolds a new one, and what it writes
 **already builds, installs and runs** — a working package to change, not a
 stub with holes. That is the only kind of scaffold that stays true: the suite
-inits one, builds it and reads it back through the Installer's own reader, so
-a format change that breaks the starting point fails in CI. The templates are
+inits one, builds it and reads it back through Coffee Shop's own reader, so a
+format change that breaks the starting point fails in CI. The templates are
 strings in `pkgs/init.mjs` rather than a `template/` directory, because a
 directory of templates inside `pkgs/` would itself be built by the bare
 `build.mjs` and published by the Packages workflow. The default id is
@@ -571,6 +573,66 @@ key and is fixed for the life of the package. A build argument is a directory
 in `pkgs/` *or a path to one anywhere*, and `--dist` redirects the output —
 which is what keeps the test's scaffolding out of the artifact the workflow
 uploads.
+
+## Coffee Shop
+
+The app store, and the only place a package is installed, removed or browsed
+from. It used to be two apps — Coffee Shop for browsing a catalogue, a
+standalone Installer for what was already on the disk — merged into one
+window because installing was already one function neither app owned
+(`installPackage`, bytes in); only the chrome around it was duplicated.
+
+- **One window, two panes**, the shape SoftwareValet used for the same two
+  questions. A tab row (`.coffeeshop-tabs`) switches between *Browse* —
+  Coffee Shop's own catalogue: search, artwork, a summary before anything is
+  downloaded, Install/Reinstall — and *Installed* — what the old Installer
+  showed: list, detail pane with Publisher/Identifier/Documents/Access,
+  Open/Remove. `view` picks which; there is one detail pane and one action
+  row, reading whichever pane is active, rather than two of each. *Browse* is
+  the one shown on launch — this is a store first, and what is already on the
+  disk is a click away rather than the default.
+- **`summary` and `description` are both optional and both shown, for
+  different jobs.** `summary` is the one line that fits in the detail pane
+  under **About**; `description` is the longer pitch under **Description**,
+  capped at a few lines with its own scrollbar (`.coffeeshop-description`)
+  rather than pushing the list out of the window, and the one field that
+  keeps the line breaks it was written with (`white-space: pre-wrap`). Both
+  panes render it the same way, from `PackageListing.description` in
+  *Browse* and `PackageManifest.description` in *Installed* — the same split
+  `iconSvg` already has between a listing and an installed package.
+- **`apps/CoffeeShop.tsx` renders the *File* menu from `listSources()`**,
+  filtered to the non-browsable ones — today just `UploadSource`, as
+  *Install from This computer…*. A browsable source has no menu item, because
+  `list()` alone is not a UI; it needs a pane, the way *Browse* is
+  `coffeeShopSource`'s. `lib/packages/coffeeshop.ts` is that `PackageSource`;
+  installing through either path calls the same `installPackage`, so the
+  confirmation, the permission list and the size caps cannot drift between
+  them. Installing from *File* switches to *Installed* and selects the
+  result, the same way installing from *Browse* leaves it selected there.
+- **`PackageListing` grew one field, `iconSvg`**, so the catalogue can show
+  artwork before anything is installed. Untrusted the same way an installed
+  package's icon is, so it is rendered only through `apps/packageApp.tsx`'s
+  `packageIcon`, never inlined directly — one sanitiser for every SVG that
+  reaches the desktop from outside it. *Installed* renders the same helper
+  over `InstalledPackage.iconSvg`, so both panes' rows carry artwork.
+- **The backend is `coffeeshop/`**, a standalone Node service with its own
+  `package.json`, `README.md` and `node --test` suite — liftable into its own
+  repository unchanged, same as `pkgs/`. It scans a directory of `.pkg` files
+  with `fflate` (the same zip reader `lib/packages/archive.ts` uses in the
+  browser) and serves the result as JSON at `/api/coffeeshop`, re-scanning on
+  an interval so a file dropped into the directory shows up without a
+  restart. Read-only: there is no upload endpoint, and publishing a package is
+  "put a `.pkg` file where it scans."
+- **`/api/coffeeshop` is the mount point on purpose** — a same-origin path a
+  reverse proxy drops straight behind, `coffeeshop/README.md` has the Apache
+  `ProxyPass` lines — so `lib/packages/coffeeshop.ts` fetches a relative URL
+  and moving from a locally-run backend to a production one behind Apache is
+  a deployment change, not a code change. In dev, `vite.config.ts`'s
+  `server.proxy` stands in for Apache, forwarding the same path to
+  `coffeeshop/`'s default port; `coffeeshop/README.md` has both sides of it.
+- Signing is still the one thing missing before a store is trustworthy, same
+  as `docs/packages.md` has always said: `publisher` is exactly as
+  unverified a string here as it is in an uploaded `.pkg`.
 
 ## Design system
 
@@ -809,9 +871,6 @@ tab *sliding* along the top edge is, via Shift-drag.
 **Draw's marquee and multiple selection.** One object is selected at a time
 today. `unionBounds` and `containsBounds` in `lib/draw/geom.ts` are already the
 predicates a marquee needs.
-
-**A package store.** `PackageSource` is the seam it plugs into and
-`docs/packages.md` is the format; only signing is missing from the design.
 
 **Bean Challenge's level editor.** Not built, but everything it needs is:
 `formatLevel` round-trips a board back to text, `formatLevelFile` /

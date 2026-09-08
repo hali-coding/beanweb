@@ -1,10 +1,11 @@
 /**
  * Where a package comes from.
  *
- * The whole of this feature's future-proofing is these two methods. Today the
- * only source is a file the user picked off their own computer; the day there
- * is an app store, it is a second class implementing the same interface and
- * nothing else moves, because the Installer browses `listSources()` and
+ * The whole of this feature's future-proofing is these two methods. `UploadSource`
+ * below is a file the user picked off their own computer; `coffeeShopSource`
+ * (`lib/packages/coffeeshop.ts`) is the app store's catalogue. A third source
+ * implements the same interface and nothing else moves, because
+ * `apps/CoffeeShop.tsx` renders a non-browsable one as a `File` menu item and
  * `installPackage` takes bytes rather than a `File`.
  *
  * `lib/beanchallenge/packs.ts` is the same shape and the same bet: one built-in
@@ -22,8 +23,19 @@ export interface PackageListing {
   version: string
   kind: PackageKind
   summary?: string
+  /** The manifest's longer pitch -- see `PackageManifest.description`. */
+  description?: string
   publisher?: string
   sizeBytes?: number
+  /**
+   * The manifest's icon, inlined as raw SVG text so a browsable source can
+   * show artwork before anything is fetched. Untrusted -- it comes from
+   * whatever the source is, same as an installed package's -- so a renderer
+   * must run it through `apps/packageApp.tsx`'s `packageIcon`, never inline it
+   * directly. Capped at `MAX_ICON_BYTES`, the same bound `InstalledPackage`
+   * holds its own icon to.
+   */
+  iconSvg?: string
 }
 
 export interface PackageSource {

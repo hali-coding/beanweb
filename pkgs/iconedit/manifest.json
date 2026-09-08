@@ -7,6 +7,7 @@
   "entry": "main.js",
   "publisher": "BeanWeb",
   "summary": "A pixel editor for icons on the 32-unit grid.",
+  "description": "Paint icons pixel by pixel, from a sixteen-colour palette, and save them as .bicon -- the same text format BeanWeb's own icons could use.\n\nOpens the file Tracker hands it, or a note in its own folder otherwise. Export SVG writes a drawing that opens straight in Draw.",
   "icon": "icon.svg",
   "window": { "defaultW": 560, "defaultH": 470, "minW": 420, "minH": 380 },
   "extensions": [".bicon"],

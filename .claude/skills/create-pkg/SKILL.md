@@ -1,6 +1,6 @@
 ---
 name: create-pkg
-description: Scaffold a new BeanWeb package — an installable `.pkg` application — from a plain-language description of what it should do. Use when asked to create, scaffold, start, or write a new package/app for BeanWeb's Installer, or when invoked as /create-pkg <purpose>.
+description: Scaffold a new BeanWeb package — an installable `.pkg` application — from a plain-language description of what it should do. Use when asked to create, scaffold, start, or write a new package/app for BeanWeb's Coffee Shop, or when invoked as /create-pkg <purpose>.
 ---
 
 # Creating a BeanWeb package
@@ -98,8 +98,9 @@ npx vitest run tests/pkgs.test.ts     # the format itself still holds
 `tests/pkgs.test.ts` only exercises `iconedit` and the `init` scaffold, not
 this specific package — passing it proves the *build tool*, not the new app.
 For the app itself, install and drive it in a real browser: the `run-beanweb`
-skill's driver can open the Installer, feed it `pkgs/dist/<id>.pkg` through a
-file chooser, launch the app from the Deskbar, and drive `.sandbox-frame` with
+skill's driver can open Coffee Shop, feed it `pkgs/dist/<id>.pkg` through
+*File → Install from This computer…*'s file chooser, launch the app from the
+Deskbar, and drive `.sandbox-frame` with
 `page.frameLocator(...)`. This matters more here than almost anywhere else in
 the repo — jsdom never executes an iframe's scripts, so nothing about whether
 the entry script actually runs can be caught any other way. Do this rather

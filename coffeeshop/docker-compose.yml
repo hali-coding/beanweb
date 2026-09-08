@@ -1,0 +1,14 @@
+# Standalone example: `docker compose up` from this directory serves whatever
+# is in ../pkgs/dist (run `npm run build:pkgs` from the repo root first, or
+# point PKG_DIR/the volume at wherever a real catalogue's .pkg files live).
+services:
+  coffeeshop:
+    build: .
+    ports:
+      - '8080:8080'
+    environment:
+      PKG_DIR: /pkgs
+      SCAN_INTERVAL_MS: '30000'
+    volumes:
+      - ../pkgs/dist:/pkgs:ro
+    restart: unless-stopped

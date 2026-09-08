@@ -99,6 +99,7 @@ Verified to print:
 |---|---|
 | `open <AppName>` | launch via the Deskbar menu — `Tracker`, `Terminal`, `StyledEdit`, `BASIC`, `Tetris`, `Claude` |
 | `click <sel>` / `dblclick <sel>` | mouse |
+| `upload <sel> <path>` | click `<sel>`, then answer the file picker it opens with `<path>` — e.g. Coffee Shop's *File → Install from This computer…* |
 | `type <sel> <text>` | fill an input/textarea |
 | `key <sel> <Key>` | e.g. `key .term-input Enter` |
 | `text <sel>` / `count <sel>` | read the DOM |

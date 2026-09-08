@@ -1,0 +1,146 @@
+/* Coffee Shop: two panes -- Installed and Browse -- sharing one list/detail/
+   actions shape. The tab row picks which; everything below reads whichever
+   is active. */
+
+.coffeeshop {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--panel);
+}
+
+.coffeeshop-tabs {
+  flex: none;
+  display: flex;
+  gap: 4px;
+  padding: 8px 10px 0;
+}
+.coffeeshop-tab {
+  flex: 1 1 0;
+  height: 22px;
+  border: none;
+  border-radius: 3px;
+  background: var(--panel);
+  color: var(--panel-text);
+  font-size: var(--fs-plain);
+  cursor: default;
+  box-shadow:
+    inset  var(--hairline)  var(--hairline) 0 0 var(--panel-lighten-max),
+    inset calc(-1 * var(--hairline)) calc(-1 * var(--hairline)) 0 0 var(--panel-darken-3),
+    inset  calc(2 * var(--hairline))  calc(2 * var(--hairline)) 0 0 var(--panel-lighten-1),
+    inset calc(-2 * var(--hairline)) calc(-2 * var(--hairline)) 0 0 var(--panel-darken-2);
+}
+.coffeeshop-tab[data-active='true'] {
+  background: var(--list-selected);
+  font-weight: 700;
+  box-shadow:
+    inset  var(--hairline)  var(--hairline) 0 0 var(--panel-darken-3),
+    inset calc(-1 * var(--hairline)) calc(-1 * var(--hairline)) 0 0 var(--panel-lighten-max),
+    inset  calc(2 * var(--hairline))  calc(2 * var(--hairline)) 0 0 var(--panel-darken-2),
+    inset calc(-2 * var(--hairline)) calc(-2 * var(--hairline)) 0 0 var(--panel-lighten-1);
+}
+.coffeeshop-tab:focus-visible {
+  outline: calc(2 * var(--hairline)) solid var(--navigation);
+  outline-offset: 1px;
+}
+
+.coffeeshop-search {
+  flex: none;
+  display: flex;
+  gap: 6px;
+  padding: 8px 10px 0;
+}
+.coffeeshop-search .b-textcontrol { flex: 1 1 auto; min-width: 0; }
+
+.coffeeshop-list {
+  flex: 1 1 auto;
+  min-height: 60px;
+  margin: 8px 10px 0;
+}
+
+.coffeeshop-empty {
+  margin: 0;
+  padding: 10px 2px;
+  font-size: var(--fs-small);
+  line-height: 15px;
+  color: var(--panel-text-dim);
+}
+.coffeeshop-empty em { font-style: normal; font-weight: 700; }
+
+.coffeeshop-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--fs-plain);
+}
+.coffeeshop-table th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  text-align: left;
+  font-weight: 400;
+  padding: 2px 6px;
+  background: var(--panel);
+  color: var(--panel-text-dim);
+  box-shadow: inset 0 calc(-1 * var(--hairline)) 0 var(--panel-darken-2);
+}
+.coffeeshop-table td {
+  padding: 2px 6px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.coffeeshop-table tbody tr { cursor: default; }
+.coffeeshop-table tbody tr[data-selected='true'] { background: var(--list-selected); }
+.coffeeshop-icon { width: 22px; padding-right: 0 !important; }
+.coffeeshop-icon svg { display: block; }
+.coffeeshop-num { text-align: right; }
+
+.coffeeshop-detail { flex: none; padding: 8px 10px 0; }
+.coffeeshop-detail .b-box { flex: none; }
+
+.coffeeshop-detail-body {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+}
+.coffeeshop-detail-icon { flex: none; }
+
+.coffeeshop-specs {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 3px 14px;
+  margin: 0;
+  font-size: var(--fs-plain);
+}
+.coffeeshop-specs dt { color: var(--panel-text-dim); }
+.coffeeshop-specs dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+.coffeeshop-perm { display: block; }
+
+/* The one field allowed to run long -- capped and scrollable rather than
+   pushing the list out of the window, the way a property panel's own
+   overflow is handled elsewhere in the app. */
+.coffeeshop-description {
+  white-space: pre-wrap;
+  max-height: 5.4em;
+  overflow-y: auto;
+}
+
+.coffeeshop-hint {
+  margin: 0;
+  padding: 10px 2px;
+  font-size: var(--fs-small);
+  line-height: 15px;
+  color: var(--panel-text-dim);
+}
+
+.coffeeshop-actions {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px;
+}
+.coffeeshop-actions .b-statusbar { flex: 1 1 auto; }

@@ -64,7 +64,7 @@ export function load(): InstalledPackage[] {
       manifest = parseManifest(JSON.stringify(entry.manifest))
     } catch {
       // A record we cannot read is a record we cannot run. Dropping it is the
-      // only option that leaves the Installer able to show the rest.
+      // only option that leaves Coffee Shop able to show the rest.
       continue
     }
     if (!manifest.id) continue
@@ -245,6 +245,6 @@ export const usePackages = create<PackagesStore>((set, get) => {
  *
  * Resolve-never-reject, the same contract as `keyReady` in `store/settings.ts`:
  * a browser that cannot open the database is in exactly the state of one with
- * nothing stored, and both leave the Installer able to list and uninstall.
+ * nothing stored, and both leave Coffee Shop able to list and uninstall.
  */
 export const packagesReady: Promise<void> = withDb(async () => undefined, undefined)

@@ -1,7 +1,7 @@
 # pkgs/
 
 Application packages for BeanWeb. Each directory here is one package, built
-into a `.pkg` you can install from the Installer.
+into a `.pkg` you can install from Coffee Shop.
 
 These are **not** part of the app. Nothing in `src/` imports them and nothing
 here imports `src/`; `pkgs/build.mjs` is a standalone node script, so a package
@@ -13,8 +13,8 @@ npm run build:pkgs            # every directory here
 node pkgs/build.mjs iconedit  # just one
 ```
 
-Output lands in `pkgs/dist/<id>.pkg` (gitignored). Install it with the
-Installer's *File → Install from this computer…*.
+Output lands in `pkgs/dist/<id>.pkg` (gitignored). Install it with Coffee
+Shop's *File → Install from This computer…*.
 
 `docs/packages.md` is the format and the `bw` API.
 
@@ -30,14 +30,15 @@ what it writes **already builds and runs** — install it and it saves a note in
 its own folder, and opens a document Tracker hands it. It is a working package
 to change rather than a stub with holes in it, which is the only version of a
 scaffold that stays honest: it is built by `tests/pkgs.test.ts` and read back
-through the Installer's own reader, so a change to the format that breaks the
+through Coffee Shop's own reader, so a change to the format that breaks the
 starting point fails in CI.
 
 | | |
 |---|---|
 | `--id` | the install key; defaults to `com.example.<dir>` |
 | `--name` | the application name; defaults to the directory, title cased |
-| `--publisher`, `--summary` | shown by the Installer |
+| `--publisher`, `--summary` | shown by Coffee Shop |
+| `--description` | the longer pitch, shown only in Coffee Shop's detail pane |
 | `--ext .bpaint` | a file type this app opens, repeatable |
 | `--into <dir>` | write it somewhere other than `pkgs/` |
 
@@ -67,7 +68,7 @@ package that built yesterday unreadable — and on demand from the Actions tab.
 
 It attaches a **packages** artifact holding every `.pkg`, a `SHA256SUMS` and a
 `packages.json` manifest. The build is verified by reading each archive back
-through the Installer's own reader, so what you download is known to install
+through Coffee Shop's own reader, so what you download is known to install
 and not merely known to exist. Checksums are taken last, after the step that
 rebuilds them, which the byte-stable build is what makes meaningful.
 

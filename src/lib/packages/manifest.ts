@@ -5,7 +5,7 @@
  * reporting: `parseManifest` throws only when there is nothing to look at, and
  * everything a human could reasonably be asked about comes back from
  * `validatePackage` as a list. That is `validateLevel`'s shape too, and for the
- * same reason -- the Installer shows the list before installing, and one day a
+ * same reason -- Coffee Shop shows the list before installing, and one day a
  * packaging tool will show the same list before publishing. One implementation,
  * so a package that passes locally is a package that passes on the way in.
  */
@@ -85,6 +85,8 @@ export function parseManifest(text: string): PackageManifest {
   if (publisher) out.publisher = publisher
   const summary = str(m.summary).trim()
   if (summary) out.summary = summary
+  const description = str(m.description).trim()
+  if (description) out.description = description
   const icon = str(m.icon).trim()
   if (icon) out.icon = icon
   if (m.singleton === true) out.singleton = true

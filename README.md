@@ -34,9 +34,9 @@ npm test         # vitest + jsdom
 - **Tetris** — 7-bag randomiser, wall kicks, a landing shadow you can switch
   off, and the classic tetromino palette muted a shade to sit against R5 grey.
   Touch pad on phones.
-- **Installer** — install applications of your own from a `.pkg` file, sandboxed
-  so they can't reach the desktop's storage or your API key. See *Building a
-  package* below.
+- **Coffee Shop** — the app store: browse a catalogue served by a small
+  backend, or install a `.pkg` file of your own, sandboxed so it can't reach
+  the desktop's storage or your API key. See *Building a package* below.
 - **Claude** — a bare-bones chat client: streaming replies, stop mid-answer,
   multi-turn history, and a **Model** menu listing what your key can actually
   reach, priced and sorted cheapest first. Defaults to the cheapest model.
@@ -67,8 +67,9 @@ drift. Models it has no price for still work; they just sort last.
 ### Building a package
 
 Applications you install come from a `.pkg` — a zip with a manifest and an
-entry script — installed from the Installer's *File → Install from this
-computer…*. It runs in a sandboxed iframe on an opaque origin, so it cannot
+entry script — installed from Coffee Shop's *File → Install from This
+computer…*, or picked from its *Browse* tab if you're running the backend in
+`coffeeshop/`. It runs in a sandboxed iframe on an opaque origin, so it cannot
 reach the desktop's storage or your API key, and its own Content-Security-Policy
 stops it calling home.
 
