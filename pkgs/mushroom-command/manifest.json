@@ -1,0 +1,14 @@
+{
+  "format": 1,
+  "id": "com.example.mushroomcommand",
+  "name": "Mushroom Command",
+  "version": "1.0.0",
+  "kind": "sandboxed",
+  "entry": "main.js",
+  "publisher": "BeanWeb",
+  "summary": "Missile command with mushrooms: shoot down falling spores before they flatten your patches.",
+  "icon": "icon.svg",
+  "window": { "defaultW": 560, "defaultH": 420, "minW": 380, "minH": 300 },
+  "singleton": true,
+  "permissions": ["fs"]
+}

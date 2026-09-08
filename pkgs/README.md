@@ -18,6 +18,47 @@ Installer's *File → Install from this computer…*.
 
 `docs/packages.md` is the format and the `bw` API.
 
+## Starting one
+
+```bash
+node pkgs/build.mjs init beanpaint
+node pkgs/build.mjs init bean-paint --name "Bean Paint" --ext .bpaint
+```
+
+That writes `pkgs/<dir>/` with a manifest, an entry script and an icon, and
+what it writes **already builds and runs** — install it and it saves a note in
+its own folder, and opens a document Tracker hands it. It is a working package
+to change rather than a stub with holes in it, which is the only version of a
+scaffold that stays honest: it is built by `tests/pkgs.test.ts` and read back
+through the Installer's own reader, so a change to the format that breaks the
+starting point fails in CI.
+
+| | |
+|---|---|
+| `--id` | the install key; defaults to `com.example.<dir>` |
+| `--name` | the application name; defaults to the directory, title cased |
+| `--publisher`, `--summary` | shown by the Installer |
+| `--ext .bpaint` | a file type this app opens, repeatable |
+| `--into <dir>` | write it somewhere other than `pkgs/` |
+
+The manifest it writes asks for the `fs` permission, because the starting app
+saves a note in its own folder. Delete the field if yours never writes — a
+package is asked about at install time and it should not ask for what it does
+not use. `docs/packages.md` has the list and what each entry grants.
+
+**Change the `id` before anyone else sees it.** It is the install key, the
+application id and the folder name, so it is fixed for the life of the package
+and two packages sharing one are the same application to every BeanWeb that
+meets them. The default is a placeholder that reads as one for that reason.
+
+`init` never writes over an existing directory: a second `init` on a package
+you already have fails and touches nothing.
+
+A `<dir>` argument to the build is a directory in `pkgs/`, or a path to one
+anywhere — so a package scaffolded with `--into` still builds, and so does one
+that has moved to its own repository. `--dist <dir>` puts the `.pkg`
+somewhere other than `pkgs/dist`.
+
 ## CI
 
 `.github/workflows/packages.yml` builds these on any change to `pkgs/` or to
