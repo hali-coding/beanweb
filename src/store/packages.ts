@@ -105,11 +105,67 @@ function open(): Promise<IDBDatabase> {
   })
 }
 
+/**
+ * The payload database, opened once.
+ *
+ * Memoised as the promise rather than the connection, the same reasoning
+ * `lib/keystore.ts` gives for its key: two reads racing during boot would each
+ * open their own otherwise.
+ *
+ * Opening per operation is not just the wasted round trip. Nothing here closes
+ * a connection, so every read and write left one open for the life of the tab,
+ * and an open connection blocks a version upgrade -- with `open`'s `onblocked`
+ * rejecting, the first bump of the schema past 1 would have found a dozen of
+ * this session's own connections in its way and failed.
+ */
+let pending: Promise<IDBDatabase | null> | null = null
+
+function db(): Promise<IDBDatabase | null> {
+  if (pending) return pending
+
+  const attempt = (async (): Promise<IDBDatabase | null> => {
+    if (typeof indexedDB === 'undefined') return null
+    try {
+      const conn = await open()
+      /* Another tab upgrading the schema is blocked while this connection is
+         open, so step out of its way and let the next call reopen. */
+      conn.onversionchange = () => {
+        conn.close()
+        pending = null
+      }
+      conn.onclose = () => {
+        pending = null
+      }
+      return conn
+    } catch {
+      return null
+    }
+  })()
+
+  pending = attempt
+  /*
+   * Memoise the connection, never the failure to get one. A browser that had
+   * no IndexedDB when this module was evaluated may have one by the first real
+   * call -- which is precisely the case in the suite, where `tests/setup.ts`
+   * imports this store before a test file installs `fake-indexeddb`. Caching
+   * the "no" there wedged every install for the rest of the run.
+   */
+  void attempt.then((conn) => {
+    if (!conn && pending === attempt) pending = null
+  })
+  return attempt
+}
+
 async function withDb<T>(fn: (db: IDBDatabase) => Promise<T>, fallback: T): Promise<T> {
-  if (typeof indexedDB === 'undefined') return fallback
+  const conn = await db()
+  if (!conn) return fallback
   try {
-    return await fn(await open())
+    return await fn(conn)
   } catch {
+    /* A transaction on a connection that has since closed fails here rather
+       than through `onclose`. Dropping the memo costs one reopen and is the
+       only way out if the held connection is dead. */
+    pending = null
     return fallback
   }
 }

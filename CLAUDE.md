@@ -12,7 +12,7 @@ npm run build      # tsc -b && vite build  -> dist/
 npm run preview    # serve the production build
 npm run build:pkgs # pack pkgs/* into installable .pkg files
 npm run typecheck  # types only
-npm test           # vitest run  (580 tests)
+npm test           # vitest run  (586 tests)
 npm run test:watch # vitest, watch mode
 ```
 
@@ -477,6 +477,13 @@ protocol inside the jsdom suite.
   shares the ~5 MB `localStorage` quota, and `store/fs.ts` swallows a quota
   failure silently. The icon is the one piece of payload kept in the index,
   because registration needs it synchronously.
+- **One IndexedDB connection, memoised as a promise** -- `lib/keystore.ts`'s
+  reasoning, plus one of its own: nothing closes a connection, and an open one
+  blocks a version upgrade, so opening per operation would have left the first
+  schema bump past 1 blocked by a dozen of this session's own connections.
+  Memoise the *connection*, never the failure to get one: the store is
+  imported by `tests/setup.ts` before a test file installs `fake-indexeddb`,
+  and caching that first "no IndexedDB here" wedges every install in the run.
 - **The registry is subscribable, and its snapshot array is cached.**
   `useSyncExternalStore` calls the getter every render, so building
   `[...apps.values()]` there never compares equal and spins into "Maximum
