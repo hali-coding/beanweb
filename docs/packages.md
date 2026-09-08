@@ -32,6 +32,7 @@ beanpaint.pkg
 
   "publisher": "Example",
   "summary": "A small painting program.",
+  "description": "A longer pitch, shown only in the detail pane.\nMay hold its own line breaks.",
   "icon": "icon.svg",
   "window": { "defaultW": 480, "defaultH": 360, "minW": 240, "minH": 180 },
   "singleton": false,                // reuse one window instead of opening more
@@ -46,6 +47,11 @@ an update.
 
 `permissions` is the one field the user is asked about before anything is
 installed. **Permissions**, below, is what the entries mean.
+
+`summary` and `description` are both optional and both shown by Coffee Shop,
+but for different jobs: `summary` is the one line that fits beside a listing,
+`description` is the longer pitch shown only in the detail pane, where line
+breaks in it are kept. A package can carry either, neither, or both.
 
 ## Limits
 
@@ -128,10 +134,10 @@ permission it asks for, as *It will be able to…* — or *It has asked for no
 special access*, which is a thing worth saying out loud. Cancel is a real
 answer; nothing is written until Install is pressed.
 
-After that the Installer's detail pane carries the same list under **Access**,
-so the ask is answerable later and not only in the moment. Installing over an
-existing package re-asks with the *new* manifest's list, so a version that
-wants more has to be agreed to again.
+After that, Coffee Shop's *Installed* tab carries the same list under
+**Access**, so the ask is answerable later and not only in the moment.
+Installing over an existing package re-asks with the *new* manifest's list, so
+a version that wants more has to be agreed to again.
 
 ### Adding one
 
@@ -201,14 +207,24 @@ interface PackageSource {
 }
 ```
 
-`UploadSource` is the only one today and is not browsable — `list()` returns
-`[]` and `fetch()` opens a file picker. A store implements the same interface
-against an HTTP endpoint and calls `registerSource(...)`; the Installer renders
-its sources from `listSources()`, and `installPackage` takes bytes, so nothing
-else has to change.
+`UploadSource` is the only unbrowsable one — `list()` returns `[]` and
+`fetch()` opens a file picker. `coffeeShopSource`
+(`lib/packages/coffeeshop.ts`) is the second: browsable, backed by an HTTP
+endpoint, and it and its backend (`coffeeshop/`, a standalone Node service —
+see `coffeeshop/README.md`) are the worked example of this section rather
+than a hypothetical. The app both live in, **Coffee Shop** (`apps/CoffeeShop.tsx`),
+is the one place a package is installed, removed or browsed from — its *File*
+menu renders an "Install from…" item for every non-browsable source via
+`listSources()`, and its *Browse* tab is `coffeeShopSource`'s catalogue,
+directly. A *third* source — a different store, say — implements the same
+interface and shows up in the File menu the same way `UploadSource` does if
+it is not browsable; a browsable one needs a pane of its own the way *Browse*
+is `coffeeShopSource`'s, because `list()` alone is not a UI. `installPackage`
+takes bytes regardless of which kind, so nothing below either path changes.
 
 Not addressed here, and needed before a store is trustworthy: **signing**.
-`publisher` is an unverified string today.
+`publisher` is an unverified string today, in an uploaded `.pkg` and in Coffee
+Shop's catalogue alike.
 
 ## Starting one
 

@@ -31,8 +31,8 @@ export interface PickOptions {
    * else. Left unset for a text import, and that is deliberate: on Windows a
    * filter list *replaces* "All files" rather than adding to it, which would
    * hide an extension-less text file. What counts as text is decided by
-   * reading the bytes. A `.pkg` has an extension by definition, so the
-   * Installer does pass one.
+   * reading the bytes. A `.pkg` has an extension by definition, so Coffee
+   * Shop's upload source does pass one.
    */
   accept?: string
   multiple?: boolean

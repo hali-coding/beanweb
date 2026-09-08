@@ -65,7 +65,7 @@ jobs:
           node pkgs/build.mjs --json > pkgs/dist/packages.json
           cat pkgs/dist/packages.json
 
-      # Reads every .pkg back through the same reader the Installer uses, so
+      # Reads every .pkg back through the same reader Coffee Shop uses, so
       # the artifact is known to install rather than merely known to exist.
       # This does rebuild them -- and asserts the rebuild is byte-identical,
       # which is what lets the checksums below be taken afterwards at all.
@@ -88,7 +88,7 @@ jobs:
               pkgs/dist/packages.json
             echo
             echo 'Download the **packages** artifact below, then install a `.pkg`'
-            echo 'from the Installer: *File -> Install from this computer…*'
+            echo 'from Coffee Shop: *File -> Install from This computer…*'
             echo
             echo '<details><summary>SHA-256</summary>'
             echo

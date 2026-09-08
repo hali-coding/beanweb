@@ -38,7 +38,7 @@ const titleCase = (slug) =>
  */
 const defaultId = (slug) => `com.example.${slug.split('-').join('')}`
 
-function manifestFor({ id, name, slug, publisher, summary, extensions }) {
+function manifestFor({ id, name, slug, publisher, summary, description, extensions }) {
   // Written by hand rather than through JSON.stringify of an object: the field
   // order in docs/packages.md is the order an author reads them in, and the
   // window box stays on one line the way iconedit's does.
@@ -52,9 +52,14 @@ function manifestFor({ id, name, slug, publisher, summary, extensions }) {
     '  "entry": "main.js",',
     `  "publisher": ${JSON.stringify(publisher)},`,
     `  "summary": ${JSON.stringify(summary)},`,
+  ]
+  // Unlike summary, left out entirely rather than defaulted: it is the longer
+  // pitch, and a placeholder one is worse than no row in the detail pane.
+  if (description) lines.push(`  "description": ${JSON.stringify(description)},`)
+  lines.push(
     '  "icon": "icon.svg",',
     '  "window": { "defaultW": 480, "defaultH": 360, "minW": 280, "minH": 200 },',
-  ]
+  )
   if (extensions.length) lines.push(`  "extensions": ${JSON.stringify(extensions)},`)
   lines.push('  "permissions": ["fs"]', '}', '')
   return lines.join('\n')
@@ -245,6 +250,7 @@ export function scaffold(parent, slug, options = {}) {
       slug,
       publisher: options.publisher || 'Unknown',
       summary: options.summary || 'A BeanWeb application.',
+      description: options.description || '',
       extensions,
     }),
     'main.js': entryFor({ name, extensions }),

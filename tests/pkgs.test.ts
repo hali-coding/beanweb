@@ -14,8 +14,8 @@ import { MAX_PACKAGE_BYTES } from '@/lib/packages/types'
  * The sample packages in `pkgs/` are built by their own script, with no
  * dependency on `src/`. That independence is the point of them, and it is also
  * how they could quietly stop being installable -- nothing else here would
- * notice. So the build runs, and its output goes through the same reader the
- * Installer uses.
+ * notice. So the build runs, and its output goes through the same reader
+ * Coffee Shop uses.
  */
 
 const ROOT = join(__dirname, '..')
@@ -27,7 +27,7 @@ const bytesOf = (id: string) => new Uint8Array(readFileSync(join(ROOT, 'pkgs', '
 describe('pkgs/iconedit', () => {
   const id = 'com.beanweb.iconedit'
 
-  it('builds a package the Installer accepts', () => {
+  it('builds a package Coffee Shop accepts', () => {
     build('iconedit')
     const bytes = bytesOf(id)
     expect(bytes.byteLength).toBeLessThan(MAX_PACKAGE_BYTES)
@@ -65,7 +65,7 @@ describe('pkgs/iconedit', () => {
 })
 
 /**
- * `init` writes a directory; `build` packs it; the Installer reads it. The
+ * `init` writes a directory; `build` packs it; Coffee Shop reads it. The
  * scaffold is only worth having if that whole line still holds, so the test
  * walks it end to end rather than asserting on the files it wrote.
  *
@@ -100,7 +100,18 @@ describe('pkgs/build.mjs init', () => {
 
   it('scaffolds a package that builds and installs unchanged', () => {
     const made = JSON.parse(
-      init('bean-paint', '--name', 'Bean Paint', '--ext', '.bpaint', '--into', tmp, '--json'),
+      init(
+        'bean-paint',
+        '--name',
+        'Bean Paint',
+        '--ext',
+        '.bpaint',
+        '--description',
+        'A longer pitch.\nWith a second line.',
+        '--into',
+        tmp,
+        '--json',
+      ),
     )
     expect(made.id).toBe('com.example.beanpaint')
     expect(made.files).toEqual(['icon.svg', 'main.js', 'manifest.json'])
@@ -113,6 +124,16 @@ describe('pkgs/build.mjs init', () => {
     expect(contents.manifest.name).toBe('Bean Paint')
     expect(contents.manifest.extensions).toEqual(['.bpaint'])
     expect(contents.manifest.permissions).toEqual(['fs'])
+    expect(contents.manifest.description).toBe('A longer pitch.\nWith a second line.')
+  })
+
+  it('leaves description out of the manifest when none is given', () => {
+    const made = JSON.parse(init('bean-paint', '--into', tmp, '--json'))
+    pack(made.dir)
+    const contents = readPackage(
+      new Uint8Array(readFileSync(join(tmp, 'dist', `${made.id}.pkg`))),
+    )
+    expect(contents.manifest.description).toBeUndefined()
   })
 
   it('names the app after the directory when nothing is given', () => {

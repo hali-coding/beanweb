@@ -1,0 +1,14 @@
+{
+  "name": "beanweb-coffeeshop",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Backend index server for the Coffee Shop -- BeanWeb's package store.",
+  "scripts": {
+    "start": "node server.mjs",
+    "test": "node --test"
+  },
+  "dependencies": {
+    "fflate": "^0.8.3"
+  }
+}

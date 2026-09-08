@@ -13,18 +13,19 @@ import type { PackageContents, PackageManifest } from '@/lib/packages/types'
 import { useFs } from '@/store/fs'
 import { usePackages } from '@/store/packages'
 
+/**
+ * `installPackage` and `uninstallPackage` themselves -- the pipeline every
+ * source (upload, Coffee Shop's catalogue, and whatever comes after) shares.
+ * Deliberately UI-agnostic: these call the functions directly and only need
+ * `<Desktop />` mounted for its alert queue, not any particular window open,
+ * which is what lets this file stay put now that Coffee Shop's *Installed*
+ * tab is what shows the result -- see tests/coffeeshop.test.tsx for that.
+ */
+
 const $ = <T extends Element = HTMLElement>(s: string) => document.querySelector<T>(s)
 const $$ = <T extends Element = HTMLElement>(s: string) => [...document.querySelectorAll<T>(s)]
 const byText = <T extends Element = HTMLElement>(sel: string, text: string) =>
   $$<T>(sel).find((n) => n.textContent?.includes(text))!
-
-const launch = async (name: string) => {
-  const before = $$('.b-window').length
-  fireEvent.pointerDown($('.b-deskbar-logo')!, { button: 0 })
-  await waitFor(() => expect($('.b-menu')).toBeTruthy())
-  fireEvent.click(byText('.b-menu-item', name))
-  await waitFor(() => expect($$('.b-window')).toHaveLength(before + 1))
-}
 
 const alertButton = (label: string) =>
   $$<HTMLButtonElement>('.b-alert-buttons .b-button').find((b) => b.textContent === label)!
@@ -187,45 +188,6 @@ describe('uninstalling a package', () => {
     fireEvent.click(alertButton('Cancel'))
     expect(await pending).toBe(false)
     expect(getApp(PKG)).toBeTruthy()
-
-    forget(PKG)
-  })
-})
-
-describe('the Installer window', () => {
-  it('launches from the Be menu and is a singleton', async () => {
-    render(<Desktop />)
-    await launch('Installer')
-    expect($('.installer')).toBeTruthy()
-
-    const count = $$('.b-window').length
-    fireEvent.pointerDown($('.b-deskbar-logo')!, { button: 0 })
-    await waitFor(() => expect($('.b-menu')).toBeTruthy())
-    fireEvent.click(byText('.b-menu-item', 'Installer'))
-    expect($$('.b-window')).toHaveLength(count)
-  })
-
-  it('says so when nothing is installed', async () => {
-    render(<Desktop />)
-    await launch('Installer')
-    expect($('.installer-empty')?.textContent).toMatch(/Nothing is installed yet/)
-  })
-
-  it('lists an installed package and shows its detail when selected', async () => {
-    render(<Desktop />)
-    await launch('Installer')
-    await install(pkgBytes({ publisher: 'Example', permissions: ['fs'] }))
-
-    await waitFor(() => expect($('.installer-table')).toBeTruthy())
-    const row = byText('.installer-table tbody tr', 'Bean Paint')
-    expect(row).toBeTruthy()
-
-    fireEvent.click(row)
-    await waitFor(() => expect($('.installer-specs')).toBeTruthy())
-    const specs = $('.installer-specs')!.textContent!
-    expect(specs).toContain('Example')
-    expect(specs).toContain(PKG)
-    expect(specs).toMatch(/Read and write files/)
 
     forget(PKG)
   })

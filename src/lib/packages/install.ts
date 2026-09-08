@@ -19,10 +19,11 @@ import {
  * Installing and removing a package.
  *
  * One exported function per action, holding its own confirmation wording, for
- * exactly the reason `lib/disk.ts` gives: more than one place offers these --
- * the Installer today, an app store later -- and what a destructive action says
- * must not be able to drift between them. Reads the stores through `getState()`
- * because these are actions, not subscriptions.
+ * exactly the reason `lib/disk.ts` gives: more than one place calls these --
+ * Coffee Shop's *Browse* tab, its *Installed* tab, and its upload item all do
+ * -- and what a destructive action says must not be able to drift between
+ * them. Reads the stores through `getState()` because these are actions, not
+ * subscriptions.
  */
 
 /** Where an installed package's stub appears, so it is in Tracker and `ls`. */
@@ -74,7 +75,7 @@ export async function installPackage(
     contents = readPackage(bytes)
   } catch (err) {
     const message = err instanceof PackageError ? err.message : String(err)
-    await desktop.showAlert('stop', 'Installer', message)
+    await desktop.showAlert('stop', 'Coffee Shop', message)
     return { error: message }
   }
 
@@ -83,7 +84,7 @@ export async function installPackage(
   const errors = errorsIn(problems)
   if (errors.length) {
     const message = `"${manifest.name || 'This package'}" cannot be installed.\n\n${problemText(errors)}`
-    await desktop.showAlert('stop', 'Installer', message)
+    await desktop.showAlert('stop', 'Coffee Shop', message)
     return { error: message }
   }
 
@@ -95,7 +96,7 @@ export async function installPackage(
   const existing = usePackages.getState().get(manifest.id)
   if (!existing && getApp(manifest.id)) {
     const message = `"${manifest.id}" is already the id of an application here.`
-    await desktop.showAlert('stop', 'Installer', message)
+    await desktop.showAlert('stop', 'Coffee Shop', message)
     return { error: message }
   }
 
@@ -112,7 +113,7 @@ export async function installPackage(
   ]
   const answer = await desktop.showAlert(
     'warn',
-    'Installer',
+    'Coffee Shop',
     lines.filter(Boolean).join('\n'),
     ['Cancel', existing ? 'Replace' : 'Install'],
     1,
@@ -138,7 +139,7 @@ export async function installPackage(
    */
   if (!(await writePayload(manifest.id, files))) {
     const message = 'This browser cannot store package files, so nothing was installed.'
-    await desktop.showAlert('stop', 'Installer', message)
+    await desktop.showAlert('stop', 'Coffee Shop', message)
     return { error: message }
   }
 
@@ -169,7 +170,7 @@ export async function uninstallPackage(id: string): Promise<boolean> {
 
   const answer = await desktop.showAlert(
     'stop',
-    'Installer',
+    'Coffee Shop',
     `Remove ${pkg.manifest.name} ${pkg.manifest.version}?\n\n` +
       `Its documents in ${packageRoot(id)} are kept.`,
     ['Cancel', 'Remove'],

@@ -117,8 +117,9 @@ const USAGE = `usage:
 init options:
   --id <reverse-dns>   the install key       (default com.example.<dir>)
   --name <title>       the application name  (default the directory, title cased)
-  --publisher <who>    shown by the Installer
-  --summary <text>     one line, shown by the Installer
+  --publisher <who>    shown by Coffee Shop
+  --summary <text>     one line, shown by Coffee Shop
+  --description <text> the longer pitch, shown only in Coffee Shop's detail pane
   --ext <.ext>         a file type this app opens; repeatable
   --into <dir>         where to write it     (default pkgs/)
   --json               print the result as JSON and nothing else`
@@ -165,6 +166,7 @@ function init(argv) {
     name: flags.name,
     publisher: flags.publisher,
     summary: flags.summary,
+    description: flags.description,
     extensions: flags.ext ?? [],
   })
 
@@ -181,8 +183,8 @@ function init(argv) {
   console.log(`
   node pkgs/build.mjs ${argument}
 
-then install pkgs/dist/${made.id}.pkg from the Installer's
-File -> Install from this computer.`)
+then install pkgs/dist/${made.id}.pkg from Coffee Shop's
+File -> Install from This computer.`)
 
   // The id is the install key and is fixed for the life of the package, so it
   // is the one field that has to be decided before anyone else sees it.

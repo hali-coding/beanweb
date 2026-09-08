@@ -1,0 +1,25 @@
+/* The sandbox fills its window; the frame carries no chrome of its own.
+   Every installed package renders through this one class pair, so it lives
+   here rather than in any one app's stylesheet -- it used to live in
+   installer.css, which briefly took it down with the Installer app when that
+   was deleted and merged into Coffee Shop, a real regression: with no rule
+   giving it a size, an <iframe> falls back to the HTML default of 300x150. */
+.sandbox {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  background: var(--document);
+}
+.sandbox-frame {
+  flex: 1 1 auto;
+  border: 0;
+  width: 100%;
+  height: 100%;
+  background: #fff;
+}
+.sandbox--empty {
+  margin: auto;
+  padding: 16px;
+  font-size: var(--fs-small);
+  color: var(--panel-text-dim);
+}

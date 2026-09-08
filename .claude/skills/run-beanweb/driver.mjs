@@ -14,6 +14,7 @@
  *   open <AppName>        launch an app via the Deskbar menu (Tracker, BASIC…)
  *   click <selector>
  *   dblclick <selector>
+ *   upload <selector> <path>  click, then answer the file picker it opens
  *   type <selector> <text>
  *   key <selector> <Key>  e.g. `key .term-input Enter`
  *   text <selector>       print textContent
@@ -223,6 +224,17 @@ async function repl() {
         case 'open': await openApp(page, arg); console.log(`opened ${arg}`); break
         case 'click': await page.click(arg); console.log('clicked'); break
         case 'dblclick': await page.dblclick(arg); console.log('double-clicked'); break
+        case 'upload': {
+          // Clicking `sel` is expected to trigger the host's file picker --
+          // Coffee Shop's *File → Install from This computer…*, for one.
+          // jsdom cannot drive this at all, which is why it is here rather
+          // than in the test suite.
+          const [sel, path] = rest
+          const [chooser] = await Promise.all([page.waitForEvent('filechooser'), page.click(sel)])
+          await chooser.setFiles(path)
+          console.log('uploaded')
+          break
+        }
         case 'type': {
           const [sel, ...t] = rest
           await page.fill(sel, t.join(' '))
