@@ -1,6 +1,6 @@
 import { memo, useCallback, useEffect, useRef, useState } from 'react'
 import { selectWindow, useDesktop } from '@/store/desktop'
-import { getApp } from '@/apps/registry'
+import { useApps } from '@/apps/registry'
 import { useViewport } from './useViewport'
 import { useWindowGesture, applyRect } from './useWindowGesture'
 
@@ -23,6 +23,7 @@ function BWindowImpl({ id, active, front }: Props) {
   const focusWindow = useDesktop((s) => s.focusWindow)
   const toggleZoom = useDesktop((s) => s.toggleZoom)
   const viewport = useViewport()
+  const apps = useApps()
 
   const elRef = useRef<HTMLDivElement>(null)
   const [tabOffset, setTabOffset] = useState(0)
@@ -64,7 +65,10 @@ function BWindowImpl({ id, active, front }: Props) {
 
   if (!win) return null
 
-  const app = getApp(win.appId)
+  // Through the subscription rather than getApp(): this component is memoised,
+  // so a window whose app registers late -- an installed package, or one whose
+  // payload is still loading -- would otherwise sit as empty chrome forever.
+  const app = apps.find((a) => a.id === win.appId)
   const Content = app?.component
 
   const className = [

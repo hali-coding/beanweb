@@ -270,3 +270,16 @@ export function PrefsIcon({ size = 32, className }: IconProps) {
     </svg>
   )
 }
+
+/** An open carton with a leaf in it: a package on its way onto the disk. */
+export function InstallerIcon({ size = 32, className }: IconProps) {
+  return (
+    <svg {...box(size)} className={className}>
+      <path d="M4 13l12-5 12 5-12 5z" fill="#c4a882" stroke="#6b563a" strokeWidth="1.5" strokeLinejoin="round" />
+      <path d="M4 13v11l12 5V18z" fill="#a98f6c" stroke="#6b563a" strokeWidth="1.5" strokeLinejoin="round" />
+      <path d="M28 13v11l-12 5V18z" fill="#8f7857" stroke="#6b563a" strokeWidth="1.5" strokeLinejoin="round" />
+      <path d="M16 3.5c2.6 1.6 3.6 3.9 2.9 6.2-2.6-1-3.7-3.1-2.9-6.2z" fill="#6fae5a" stroke="#3f6b33" strokeWidth="1.2" strokeLinejoin="round" />
+      <path d="M16 9.8V5.6" stroke="#3f6b33" strokeWidth="1.2" strokeLinecap="round" />
+    </svg>
+  )
+}

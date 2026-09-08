@@ -25,15 +25,26 @@ export const MAX_IMPORT_BYTES = 512 * 1024
 /** NUL, or the replacement character a failed UTF-8 decode leaves behind. */
 const looksBinary = (text: string) => /[\u0000\uFFFD]/.test(text)
 
+export interface PickOptions {
+  /**
+   * An `accept` filter, for a caller that wants one file type and nothing
+   * else. Left unset for a text import, and that is deliberate: on Windows a
+   * filter list *replaces* "All files" rather than adding to it, which would
+   * hide an extension-less text file. What counts as text is decided by
+   * reading the bytes. A `.pkg` has an extension by definition, so the
+   * Installer does pass one.
+   */
+  accept?: string
+  multiple?: boolean
+}
+
 /** Open the host's file picker. Resolves `[]` if the user cancels. */
-export function pickFiles(): Promise<File[]> {
+export function pickFiles(options: PickOptions = {}): Promise<File[]> {
   return new Promise((resolve) => {
     const input = document.createElement('input')
     input.type = 'file'
-    input.multiple = true
-    // Deliberately no `accept`: on Windows a filter list *replaces* "All
-    // files" rather than adding to it, which would hide an extension-less
-    // text file. What counts as text is decided by reading the bytes.
+    input.multiple = options.multiple ?? true
+    if (options.accept) input.accept = options.accept
     input.addEventListener('change', () => resolve([...(input.files ?? [])]), { once: true })
     // Where the browser fires it, this settles the promise on a cancelled
     // picker instead of leaving it pending for the life of the tab.

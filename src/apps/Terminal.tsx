@@ -3,7 +3,7 @@ import { TerminalIcon } from '@/lib/icons'
 import { basename, dirname, resolvePath, useFs } from '@/store/fs'
 import { useDesktop } from '@/store/desktop'
 import { exportNode, importFromHost } from '@/lib/transfer'
-import { launchApp, listApps, registerApp } from './registry'
+import { appForFile, launchApp, listApps, registerApp } from './registry'
 import type { AppProps } from './registry'
 import './terminal.css'
 
@@ -87,7 +87,7 @@ export function Terminal({ windowId, args }: AppProps) {
               'edit <file>     open a file in StyledEdit',
               'basic <file>    open a program in BASIC',
               'draw <file>     open a drawing in Draw',
-              'open <app>      launch an application',
+              'open <app|file> launch an application, or open a file',
               'mkdir <dir>     create a directory',
               'touch <file>    create an empty file',
               'rm <path>       remove a file or directory',
@@ -168,8 +168,26 @@ export function Terminal({ windowId, args }: AppProps) {
         case 'open': {
           if (!arg) return emit('open: missing operand', 'err')
           const app = listApps().find((a) => a.id === arg.toLowerCase() || a.name.toLowerCase() === arg.toLowerCase())
-          if (!app) return emit(`open: ${arg}: no such application`, 'err')
-          launchApp(app.id)
+          if (app) {
+            launchApp(app.id)
+            break
+          }
+          /*
+           * Not an application, so try it as a file and let whichever app
+           * claims the extension have it -- which is how a file type belonging
+           * to an installed package is reachable from here without a verb of
+           * its own. `edit`, `basic` and `draw` stay as they are: those name an
+           * application deliberately, and will make an empty file to open.
+           */
+          const target = resolvePath(cwd, arg)
+          const node = state.nodes[target]
+          if (!node) return emit(`open: ${arg}: no such application or file`, 'err')
+          if (node.kind === 'dir') return emit(`open: ${arg}: is a directory`, 'err')
+          if (node.kind === 'app' && node.appId) {
+            launchApp(node.appId)
+            break
+          }
+          launchApp(appForFile(node.name)?.id ?? 'styledit', { path: target }, node.name)
           break
         }
 

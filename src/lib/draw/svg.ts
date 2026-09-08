@@ -727,7 +727,7 @@ const SAFE_SCHEME = /^(?:https?:|mailto:|data:image\/(?:png|jpeg|jpg|gif|webp)[;
  * some case the browser reads differently. The DOM already did that parse, so
  * walk it, drop what executes, and serialise afterwards.
  */
-function sanitize(el: Element): string {
+export function sanitize(el: Element): string {
   if (isExecutable(el)) return ''
   const clone = el.cloneNode(true) as Element
   scrub(clone)

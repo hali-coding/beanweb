@@ -1,0 +1,14 @@
+{
+  "format": 1,
+  "id": "com.beanweb.iconedit",
+  "name": "IconEdit",
+  "version": "1.0.0",
+  "kind": "sandboxed",
+  "entry": "main.js",
+  "publisher": "BeanWeb",
+  "summary": "A pixel editor for icons on the 32-unit grid.",
+  "icon": "icon.svg",
+  "window": { "defaultW": 560, "defaultH": 470, "minW": 420, "minH": 380 },
+  "extensions": [".bicon"],
+  "permissions": ["fs"]
+}

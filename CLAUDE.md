@@ -10,13 +10,15 @@ filesystem, shell, and window manager all run in the tab.
 npm run dev        # Vite dev server with HMR
 npm run build      # tsc -b && vite build  -> dist/
 npm run preview    # serve the production build
+npm run build:pkgs # pack pkgs/* into installable .pkg files
 npm run typecheck  # types only
-npm test           # vitest run  (519 tests)
+npm test           # vitest run  (586 tests)
 npm run test:watch # vitest, watch mode
 ```
 
-CI runs typecheck -> test -> build on every PR
-(`.github/workflows/ci.yml`).
+CI runs typecheck -> test -> build on every PR (`.github/workflows/pr.yml`),
+and `.github/workflows/packages.yml` builds `pkgs/` into an installable
+**packages** artifact when the packages or the format change.
 
 ## Testing
 
@@ -62,9 +64,11 @@ src/
               keystore.ts (sealed storage for the API key),
               transfer.ts (import/export between the host and the disk),
               basic/ (the BASIC engine), beanchallenge/ (the game's rules),
-              draw/ (the vector document model and the SVG file format)
+              draw/ (the vector document model and the SVG file format),
+              packages/ (the .pkg format and the sandbox protocol)
   store/      desktop.ts (windows, focus, modals), fs.ts (virtual FS),
-              settings.ts (API key, model, theme)
+              settings.ts (API key, model, theme),
+              packages.ts (installed packages: index + payloads)
   wm/         BWindow, WindowLayer, useWindowGesture, useViewport
   widgets/    controls.tsx (Button, CheckBox, …), Menu.tsx (MenuBar + MenuPanel)
   apps/       registry.ts + one file per app + index.ts
@@ -429,6 +433,123 @@ so *File → Export SVG…* can hand the browser a drawing that is not on the di
 `exportNode` is now just its filesystem-node caller.
 
 
+## Packages
+
+A user can install an application. A **package** is a zip named `.pkg` — R5's
+own installer extension — holding a `manifest.json`, an entry script and an
+optional icon; `apps/Installer.tsx` lists what is installed and installs more.
+`docs/packages.md` is the format, written for whoever builds a store.
+
+`lib/packages/` is pure data with no DOM, like `lib/draw/` and
+`lib/basic/screen.ts`, which is what puts the format and the whole sandbox
+protocol inside the jsdom suite.
+
+- **`allow-scripts` without `allow-same-origin`, and never both.** The pair
+  defeats the sandbox entirely: the guest reaches this origin and everything on
+  it, including the sealed API key `lib/keystore.ts` is honest about not being
+  able to hide from a script on the page. `allow-scripts` alone gives an
+  *opaque* origin — the guest's storage is not ours and `parent.localStorage`
+  throws. This one attribute is the whole security story. If a package seems to
+  need same-origin, it needs a bridge verb instead.
+- **The guest carries its own CSP** (`default-src 'none'; connect-src 'none'`).
+  The sandbox stops a package *reading* BeanWeb's data; the CSP stops it
+  *sending* what the `fs` permission lets it read. Isolation without it buys
+  nothing against exfiltration. There is still no CSP on the top-level page —
+  that is Apache config outside this repo, and `index.html`'s pre-paint theme
+  script would need a nonce first.
+- **Validate by `event.source`, never by origin.** An opaque origin posts
+  `origin === "null"`, so every sandboxed frame looks alike and checking it
+  proves nothing. Compare against the frame's own `contentWindow`. Replies go
+  out with `'*'`, which is unavoidable and costs nothing, because the frame
+  being posted to is one we built.
+- **The entry script is emitted inside `<body>`, last.** Without an explicit
+  `<body>` the parser leaves every leading `<script>` in the head and a package
+  whose first line touches `document.body` gets null. Found by running one in a
+  real browser — jsdom never executes an iframe's scripts, so nothing in the
+  suite can catch this class of bug. Drive the browser.
+- **Every guest path is resolved with `resolvePath` and then checked for the
+  package root prefix.** `resolvePath` already collapses `..` and clamps at
+  `/`; re-implementing the traversal rules is how the two come to disagree.
+- **The index and the payload live apart.** Manifests go to `localStorage`
+  because `main.tsx` must register every installed app *before the first
+  render* — a restored window resolves its app on the first pass or paints as
+  empty chrome. The files go to IndexedDB: they are binary, the disk already
+  shares the ~5 MB `localStorage` quota, and `store/fs.ts` swallows a quota
+  failure silently. The icon is the one piece of payload kept in the index,
+  because registration needs it synchronously.
+- **One IndexedDB connection, memoised as a promise** -- `lib/keystore.ts`'s
+  reasoning, plus one of its own: nothing closes a connection, and an open one
+  blocks a version upgrade, so opening per operation would have left the first
+  schema bump past 1 blocked by a dozen of this session's own connections.
+  Memoise the *connection*, never the failure to get one: the store is
+  imported by `tests/setup.ts` before a test file installs `fake-indexeddb`,
+  and caching that first "no IndexedDB here" wedges every install in the run.
+- **The registry is subscribable, and its snapshot array is cached.**
+  `useSyncExternalStore` calls the getter every render, so building
+  `[...apps.values()]` there never compares equal and spins into "Maximum
+  update depth exceeded" — the `useShallow` failure again. Build it in
+  `emit()`. The Deskbar's menu used to be memoised on a stable action and so
+  was computed once per mount; an app installed afterwards could never appear
+  in it, and `tests/installer.test.tsx` keeps that honest.
+- **`readPackage` and `writePackage` are exact inverses and byte-stable**, the
+  contract `toSVG`/`parseSVG` and `formatLevel`/`parseLevel` hold. Entry mtimes
+  are pinned to a *locally constructed* 1980 date: fflate encodes the DOS
+  timestamp with `getFullYear()`/`getHours()` and throws below 1980, so an
+  epoch-0 mtime fails outright west of UTC and shifts the bytes by the
+  machine's offset everywhere else.
+- **A package's icon goes through `lib/draw/svg.ts`'s `sanitize()`.** It is
+  markup from a stranger rendered into *this* page, which is the same problem
+  foreign drawing markup poses and wants the same answer — a walk of the parsed
+  DOM, not a regex. The guest's own `index.html` is deliberately *not*
+  sanitised: it is alone on an opaque origin, so script it brings is script it
+  could have written in its entry file anyway.
+- **`installPackage` takes bytes, not a `File`.** That plus `PackageSource`'s
+  two methods is the entire app-store seam: a store is a second source and
+  nothing below it changes. One source ships (`UploadSource`), and the
+  Installer renders from `listSources()` even though there is one, or the seam
+  is untested and will not fit when the store arrives.
+- **The payload is written before the package is recorded.** A browser that
+  cannot store files installs nothing, rather than leaving a menu entry that
+  opens an empty window for the life of the profile.
+- Uninstalling closes windows with `requestClose` and abandons if a guard says
+  no, as the shutdown sequence does. It leaves `/boot/home/packages/<id>/`
+  alone and says so: the user's documents are not the app's to delete.
+- Deliberately not done: signing (`publisher` is an unverified string), a
+  `'blob'` fs node kind (so a `.pkg` never lives on the virtual disk — install
+  reads from the host and unpacks), and any defence against a package merely
+  wasting CPU in its own frame.
+
+- **A package claiming a file type gets that one file, and nothing else near
+  it.** Tracker launches it with the document as `args.path`; the bridge
+  reports it from `ready` and allows exactly that path outside the package
+  folder. The double-click is the consent, the same as choosing a file from a
+  panel. It has to be named exactly — no relative route, no listing the
+  directory it sits in, no deleting it. The field comes from the host: no verb
+  a guest can send opens a window, so it cannot forge one.
+
+### Adding a file type
+
+`AppDef.extensions` claims one — `['.bas']` on BASIC, `['.svg']` on Draw, and
+whatever an installed package declares. Tracker's open chain and Terminal's
+`open` both route through `appForFile`, falling back to StyledEdit. Terminal's
+`edit`/`basic`/`draw` verbs stay as they are: those name an application on
+purpose and will create an empty file to open.
+
+### pkgs/
+
+`pkgs/` holds package *sources* and is not part of the app: nothing in `src/`
+imports it and `pkgs/build.mjs` imports nothing from `src/`, so a package could
+move to its own repository unchanged. That independence is the check that the
+format is really a format, and `tests/pkgs.test.ts` runs the build and reads
+the result back through the Installer's own reader so it cannot quietly stop
+being installable.
+
+`pkgs/iconedit` is the worked example — a pixel editor in plain ES2020 with no
+build step, using `bw.fs`, `bw.setTitle`, `bw.alert` and the opened document.
+It is also where the two things a sandboxed frame *cannot* do are visible:
+there is no `allow-modals`, so `prompt()` and `confirm()` are blocked and it
+draws its own sheets, and `connect-src 'none'` means a `fetch` never leaves.
+
 ## Design system
 
 Greys are **derived, not picked**. R5 computes every shade from the panel colour
@@ -655,6 +776,9 @@ tab *sliding* along the top edge is, via Shift-drag.
 **Draw's marquee and multiple selection.** One object is selected at a time
 today. `unionBounds` and `containsBounds` in `lib/draw/geom.ts` are already the
 predicates a marquee needs.
+
+**A package store.** `PackageSource` is the seam it plugs into and
+`docs/packages.md` is the format; only signing is missing from the design.
 
 **Bean Challenge's level editor.** Not built, but everything it needs is:
 `formatLevel` round-trips a board back to text, `formatLevelFile` /

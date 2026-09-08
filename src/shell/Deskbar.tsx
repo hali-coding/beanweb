@@ -3,7 +3,7 @@ import { useShallow } from 'zustand/react/shallow'
 import { LeafIcon } from '@/lib/icons'
 import { MenuPanel } from '@/widgets/Menu'
 import type { MenuItem } from '@/widgets/Menu'
-import { getApp, launchApp, listApps } from '@/apps/registry'
+import { getApp, launchApp, useApps } from '@/apps/registry'
 import { useDesktop } from '@/store/desktop'
 import { useViewport } from '@/wm/useViewport'
 
@@ -58,12 +58,18 @@ export function Deskbar() {
   const minimizeWindow = useDesktop((s) => s.minimizeWindow)
   const beginShutdown = useDesktop((s) => s.beginShutdown)
 
+  // Subscribed, not read once: installing a package registers an app after
+  // this component has mounted, and a memo over a stable action never re-runs.
+  const apps = useApps()
+
   const items: MenuItem[] = useMemo(
     () => [
-      ...listApps().map((app) => ({
-        label: app.name,
-        onSelect: () => launchApp(app.id),
-      })),
+      ...apps
+        .filter((app) => !app.hidden)
+        .map((app) => ({
+          label: app.name,
+          onSelect: () => launchApp(app.id),
+        })),
       { separator: true },
       { label: 'About BeanWeb…', onSelect: () => launchApp('about') },
       { separator: true },
@@ -71,7 +77,7 @@ export function Deskbar() {
       { label: 'Restart', onSelect: () => void beginShutdown('restart') },
       { label: 'Shut Down', onSelect: () => void beginShutdown('shutdown') },
     ],
-    [beginShutdown],
+    [apps, beginShutdown],
   )
 
   const onAppClick = useCallback(

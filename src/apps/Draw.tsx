@@ -1333,4 +1333,5 @@ registerApp({
   defaultH: 560,
   minW: 400,
   minH: 300,
+  extensions: ['.svg'],
 })
