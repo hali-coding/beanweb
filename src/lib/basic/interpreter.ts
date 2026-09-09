@@ -284,7 +284,10 @@ export class Interpreter {
     }
 
     this.pendingInput = null
-    this.screen.write(`${text}\n`)
+    // Only the newline that ends the line: the window that collected the keys
+    // echoed them as they were typed, so echoing the answer again here would
+    // print it twice.
+    this.screen.write('\n')
     this.status = 'running'
     this.pc += 1
   }

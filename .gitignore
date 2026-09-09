@@ -16,4 +16,5 @@ pkgs/dist/
 pkgs/**/
 !pkgs/iconedit
 !pkgs/mushroom-command
+!pkgs/bean-sweeper
 

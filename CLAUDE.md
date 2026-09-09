@@ -12,7 +12,7 @@ npm run build      # tsc -b && vite build  -> dist/
 npm run preview    # serve the production build
 npm run build:pkgs # pack pkgs/* into installable .pkg files
 npm run typecheck  # types only
-npm test           # vitest run  (586 tests)
+npm test           # vitest run  (622 tests)
 npm run test:watch # vitest, watch mode
 ```
 
@@ -144,25 +144,57 @@ wording comes from. Restart skips the parked window and boots straight back up.
 ## BASIC graphics and the screen window
 
 The BASIC editor and the program's screen are **two windows**. `apps/Basic.tsx`
-holds the listing and a console transcript; `apps/BasicScreen.tsx` is the
-program's actual display, text and pixels together, the way QBasic's output
-screen was a separate thing from its editor.
+holds the listing and nothing else; `apps/BasicScreen.tsx` is the program's
+whole output, text and pixels together, the way QBasic's output screen was a
+separate thing from its editor.
 
-- **The screen window opens by itself**, the first time a program draws and
-  again on every SCREEN mode change. A program that only prints never opens
-  one. *Run -> Show screen* opens it by hand.
+- **There is one output, and it is the screen.** The editor had a console pane
+  under the listing for a while; it was a second transcript of what the screen
+  already showed, since the interpreter writes every PRINT into the screen's
+  text layer as well. Errors and `Break` go there too — the status line under
+  the listing says which row failed, not what went wrong.
+- **The screen window opens with the editor and closes with it.** It is not
+  waited for: a program that only prints has as much to show as one that
+  draws. It stays closable, and `host.show()` — called when a program starts
+  drawing and on every SCREEN mode change — brings back one the user closed by
+  hand, as does *Run -> Show screen*. Everything but that menu item reopens it
+  *without* focusing it, or a mode change halfway through a run would take the
+  caret out of the listing.
+- **INPUT is typed on the screen, and the window that collects the keys owns
+  the echo.** The screen window buffers the line in a ref, draws it at the
+  cursor the prompt left behind with an underscore for a caret, and hands the
+  finished line to `session.submitInput`; `resumeInput` therefore writes only
+  the newline that ends it, or the answer would appear twice. The line is
+  capped to its own row: a wrap at the foot of the screen scrolls the text
+  under it and would leave the anchor pointing at the wrong row. The cap is on
+  the *write*, not only on what may be typed — `write` wraps after filling the
+  last cell, so a prompt that ended in the final column or two leaves no room
+  for even the caret and the echo has to clamp itself.
+- **Questions are counted, not watched for.** The screen window takes its
+  anchor from `session.inputGeneration`, bumped by `beginInput()` in the
+  editor's `pump` — the one place that sees a slice end on `awaiting-input`.
+  Watching `status` instead looks right and fails on the second question:
+  the editor mirrors its React state into the session, and answering an INPUT
+  that leads straight back to another (`guess.bas`, INPUT then GOTO) takes
+  that state awaiting-input -> running -> awaiting-input inside one event,
+  which React coalesces into no change at all. `beginInput` sets `status`
+  itself for the same reason.
+- **Run does not clear the screen.** QBasic did not either — that is what CLS
+  is for, and every listing that wants a clean screen says so on its first
+  line.
 - **F5 runs and Esc breaks, but only Esc is window-local.** The editor handles
-  both on its app root, so they fire from the listing, the console and the
-  INPUT box. The screen window handles F5 as well — pressed there it would
-  otherwise reload the tab and take the desktop with it — and reaches the
-  editor's controls through `session.run` / `session.stop`, mutable fields the
-  editor installs in an effect. Esc is deliberately *not* stolen there:
-  `inkeyFor` reports it as `CHR$(27)` and listings that quit on Escape need to
-  see it. To stop such a program, press Esc in the editor window.
+  both on its app root, so they fire from anywhere in the listing. The screen
+  window handles F5 as well — pressed there it would otherwise reload the tab
+  and take the desktop with it — and reaches the editor's controls through
+  `session.run` / `session.stop`, mutable fields the editor installs in an
+  effect. Esc is deliberately *not* stolen there: `inkeyFor` reports it as
+  `CHR$(27)` and listings that quit on Escape need to see it. To stop such a
+  program, press Esc in the editor window.
 - **The two windows meet in `lib/basic/session.ts`**, a module-level Map keyed
   by the editor's window id — the same reasoning as `lib/closeGuards`. What
-  passes between them is a `Screen` mutated thousands of times a second and a
-  keyboard queue; a Zustand store would mean a store write per pixel.
+  passes between them is a `Screen` mutated thousands of times a second, a
+  keyboard queue, and the three functions the editor installs — `run`, `stop`
+  and `submitInput`; a Zustand store would mean a store write per pixel.
   `createSession` runs during render but the teardown is an effect, so the
   effect must `attachSession` on the way in — React runs mount/cleanup/mount in
   development, and the throwaway pass's cleanup would otherwise unregister a

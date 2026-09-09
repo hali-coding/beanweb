@@ -9,7 +9,7 @@ import { useFs } from '@/store/fs'
 
 /**
  * The app half. The runtime itself is covered in basic.test.ts; this is about
- * the pump, the console, and the file/close plumbing.
+ * the pump, the screen window, and the file/close plumbing.
  *
  * The pump drives itself with setTimeout, so these use fake timers and advance
  * explicitly — on real timers a running program would race the assertions.
@@ -26,10 +26,23 @@ function mount() {
   return { id, ...view }
 }
 
+/**
+ * Render the screen window the BASIC window already opened, and hand back its
+ * surface.
+ *
+ * The id comes from the session, not from a second `openWindow`: `Basic` opens
+ * that window on mount, so a test that made its own would drive a window the
+ * app never created and leave a spare one in the store.
+ */
+function mountScreen(owner: string) {
+  const screenId = getSession(owner)!.screenWindow!
+  render(<BasicScreen windowId={screenId} args={{ owner }} />)
+  return $$('.bscreen').at(-1)!
+}
+
 const $ = <T extends Element = HTMLElement>(s: string) => document.querySelector<T>(s)
 const $$ = <T extends Element = HTMLElement>(s: string) => [...document.querySelectorAll<T>(s)]
 const editor = () => $<HTMLTextAreaElement>('.basic-source')!
-const consoleText = () => $('.basic-output')?.textContent ?? ''
 const state = () => $('.basic-state')?.textContent ?? ''
 /** Scoped to the button bar: `.basic button` would also match the menu bar,
  *  whose "Run" title is a button too. */
@@ -38,6 +51,19 @@ const button = (label: string) =>
 
 /** A newline, kept as a constant so test sources stay easy to read. */
 const BREAK = String.fromCharCode(10)
+
+/**
+ * Everything the program has said. There is no console any more: text, the
+ * INPUT line and the error report all land on the session's `Screen`, which is
+ * pure data and so readable here even though its canvas is not.
+ */
+const screenText = (id: string) => {
+  const screen = getSession(id)?.screen
+  if (!screen) return ''
+  const rows = []
+  for (let row = 1; row <= screen.rows; row += 1) rows.push(screen.rowText(row))
+  return rows.join(BREAK)
+}
 
 const setSource = (text: string) => fireEvent.change(editor(), { target: { value: text } })
 
@@ -79,10 +105,10 @@ describe('BASIC app', () => {
     expect(state()).toBe('ready')
   })
 
-  it('runs a program and prints to the console', async () => {
-    mount()
+  it('runs a program and prints to the screen', async () => {
+    const { id } = mount()
     await runProgram('PRINT "HI THERE"')
-    expect(consoleText()).toContain('HI THERE')
+    expect(screenText(id)).toContain('HI THERE')
     expect(state()).toBe('done')
   })
 
@@ -93,26 +119,26 @@ describe('BASIC app', () => {
   })
 
   it('reports a syntax error against its line without running', async () => {
-    mount()
+    const { id } = mount()
     // Errors point at the source row now, not a BASIC line number.
     await runProgram('PRINT "OK"\nFOR = 3')
     expect(state()).toContain('error in line 2')
-    expect(consoleText()).toContain('Syntax error')
+    expect(screenText(id)).toContain('Syntax error')
     // The program never started, so nothing was printed.
-    expect(consoleText()).not.toContain('OK')
+    expect(screenText(id)).not.toContain('OK')
   })
 
   it('reports a runtime error with its line', async () => {
-    mount()
+    const { id } = mount()
     await runProgram('PRINT "A"\nPRINT 1 / 0')
-    expect(consoleText()).toContain('A')
+    expect(screenText(id)).toContain('A')
     expect(state()).toContain('error in line 2')
-    expect(consoleText()).toContain('Division by zero')
+    expect(screenText(id)).toContain('Division by zero')
   })
 
   describe('the infinite program', () => {
     it('stays responsive and can be stopped', async () => {
-      mount()
+      const { id } = mount()
       // The canonical hang, in its QBasic spelling. If the pump were a plain
       // loop this test would never return.
       await runProgram('DO' + BREAK + 'LOOP', 5)
@@ -123,38 +149,103 @@ describe('BASIC app', () => {
         fireEvent.click(button('Stop')!)
       })
       expect(state()).toBe('done')
-      expect(consoleText()).toContain('Break')
+      expect(screenText(id)).toContain('Break')
     })
 
     it('stops scheduling further slices once stopped', async () => {
-      mount()
+      const { id } = mount()
       await runProgram('DO' + BREAK + 'LOOP', 5)
       await act(async () => {
         fireEvent.click(button('Stop')!)
       })
-      const after = consoleText()
+      const after = screenText(id)
       await pump(20)
-      expect(consoleText()).toBe(after) // nothing more happened
+      expect(screenText(id)).toBe(after) // nothing more happened
     })
   })
 
   describe('INPUT', () => {
-    it('prompts, then resumes with what was typed', async () => {
-      mount()
-      await runProgram('10 INPUT "NAME"; N$\n20 PRINT "HI "; N$')
-      expect($('.basic-input')).toBeTruthy()
-      expect($('.basic-prompt')?.textContent).toBe('NAME?')
+    it('is typed on the screen, echoed as it goes, and resumes the program', async () => {
+      const { id } = mount()
+      const surface = mountScreen(id)
+
+      await runProgram('10 INPUT "NAME"; N$' + BREAK + '20 PRINT "HI "; N$')
       expect(state()).toBe('waiting for input')
 
-      const field = $<HTMLInputElement>('.basic-input')!
-      fireEvent.change(field, { target: { value: 'World' } })
+      for (const ch of 'Worldx') fireEvent.keyDown(surface, { key: ch })
+      fireEvent.keyDown(surface, { key: 'Backspace' })
+      // The caret is drawn, not a cursor, and Backspace erased the cell it left.
+      expect(screenText(id)).toContain('NAME? World_')
+
       await act(async () => {
-        fireEvent.keyDown(field, { key: 'Enter' })
+        fireEvent.keyDown(surface, { key: 'Enter' })
       })
       await pump()
 
-      expect(consoleText()).toContain('HI World')
+      expect(screenText(id)).toContain('NAME? World')
+      expect(screenText(id)).toContain('HI World')
       expect(state()).toBe('done')
+    })
+
+    it('takes a second answer when the program asks again', async () => {
+      const { id } = mount()
+      const surface = mountScreen(id)
+
+      // guess.bas's shape: one INPUT, asked again from inside a loop.
+      await runProgram(
+        '10 INPUT "GUESS"; G' + BREAK + '20 IF G < 42 THEN GOTO 10' + BREAK + '30 PRINT "GOT IT"',
+      )
+      const answer = async (text: string) => {
+        for (const ch of text) fireEvent.keyDown(surface, { key: ch })
+        await act(async () => {
+          fireEvent.keyDown(surface, { key: 'Enter' })
+        })
+        await pump()
+      }
+
+      await answer('1')
+      expect(state()).toBe('waiting for input')
+      await answer('42')
+      expect(screenText(id)).toContain('GOT IT')
+      expect(state()).toBe('done')
+    })
+
+    it('does not scroll when the prompt ends against the right edge', async () => {
+      const { id } = mount()
+      const surface = mountScreen(id)
+
+      // The prompt lands on the bottom row with two cells left, so even the
+      // bare caret would wrap — and a wrap here scrolls the anchor away.
+      await runProgram(
+        '10 PRINT "MARKER"' + BREAK + '20 LOCATE 25, 77' + BREAK + '30 INPUT ""; N$',
+      )
+      expect(state()).toBe('waiting for input')
+
+      const screen = getSession(id)!.screen
+      expect(screen.rowText(1)).toContain('MARKER')
+      expect(screen.rowText(25)).toContain('?')
+
+      // There is no room for an answer either, and Enter still ends the line.
+      fireEvent.keyDown(surface, { key: 'x' })
+      expect(screen.rowText(1)).toContain('MARKER')
+      await act(async () => {
+        fireEvent.keyDown(surface, { key: 'Enter' })
+      })
+      await pump()
+      expect(state()).toBe('done')
+    })
+
+    it('keeps the answer on its own row rather than wrapping the screen', async () => {
+      const { id } = mount()
+      const surface = mountScreen(id)
+
+      await runProgram('INPUT "N"; N$')
+      // Far more than the 80-column row can hold.
+      for (let i = 0; i < 200; i += 1) fireEvent.keyDown(surface, { key: 'x' })
+
+      const screen = getSession(id)!.screen
+      expect(screen.rowText(2)).toBe('')
+      expect(screen.rowText(1).length).toBeLessThanOrEqual(screen.cols)
     })
   })
 
@@ -163,27 +254,52 @@ describe('BASIC app', () => {
     const screenWindow = () =>
       Object.values(useDesktop.getState().windows).find((w) => w.appId === 'basic-screen')
 
-    it('stays shut for a program that only prints', async () => {
-      mount()
-      await runProgram('PRINT "TEXT ONLY"')
-      expect(screenWindow()).toBeUndefined()
-    })
-
-    it('opens as soon as a program draws', async () => {
+    it('opens with the BASIC window, before any program has run', () => {
       const { id } = mount()
-      await runProgram('SCREEN 13' + BREAK + 'PSET (10, 10), 4')
       const win = screenWindow()
       expect(win).toBeDefined()
       // It is bound to the BASIC window that opened it.
       expect(win?.args?.owner).toBe(id)
     })
 
-    it('opens once, however much the program draws', async () => {
+    it('leaves the keyboard on the listing when it opens', () => {
+      const { id } = mount()
+      expect(useDesktop.getState().activeId).toBe(id)
+    })
+
+    it('sits beside the listing rather than on top of it', () => {
+      // jsdom's window is 1024 wide, which is not room for both; the cascade
+      // is the deliberate fallback, so the test has to make room first.
+      const was = window.innerWidth
+      window.innerWidth = 1600
+      try {
+        const { id } = mount()
+        const editor = useDesktop.getState().windows[id]
+        const screen = useDesktop.getState().windows[screenWindow()!.id]
+        expect(screen.rect.x).toBe(editor.rect.x + editor.rect.w + 8)
+        expect(screen.rect.y).toBe(editor.rect.y)
+      } finally {
+        window.innerWidth = was
+      }
+    })
+
+    it('stays one window, however much the program draws', async () => {
       mount()
       await runProgram('SCREEN 13' + BREAK + 'FOR i = 1 TO 50' + BREAK + 'PSET (i, i), 4' + BREAK + 'NEXT i')
       expect(
         Object.values(useDesktop.getState().windows).filter((w) => w.appId === 'basic-screen'),
       ).toHaveLength(1)
+    })
+
+    it('comes back on the next Run if it was closed by hand', async () => {
+      mount()
+      await act(async () => {
+        useDesktop.getState().closeWindow(screenWindow()!.id)
+      })
+      expect(screenWindow()).toBeUndefined()
+
+      await runProgram('PRINT "AGAIN"')
+      expect(screenWindow()).toBeDefined()
     })
 
     it('draws into the session screen the window reads from', async () => {
@@ -193,8 +309,11 @@ describe('BASIC app', () => {
       expect(screen?.pixels[20 * 320 + 10]).toBe(4)
     })
 
-    it('is opened on demand from the Run menu', async () => {
+    it('is brought back on demand from the Run menu', async () => {
       mount()
+      await act(async () => {
+        useDesktop.getState().closeWindow(screenWindow()!.id)
+      })
       await act(async () => {
         fireEvent.pointerDown(
           $$('.basic .b-menubar-item').find((n) => n.textContent === 'Run')!,
@@ -209,7 +328,6 @@ describe('BASIC app', () => {
 
     it('closes with the BASIC window that owns it', async () => {
       const { unmount } = mount()
-      await runProgram('SCREEN 13' + BREAK + 'PSET (1, 1), 4')
       expect(screenWindow()).toBeDefined()
 
       // Unmounting is what a close comes down to, and it is the path that
@@ -222,8 +340,7 @@ describe('BASIC app', () => {
 
     it('renders a canvas for its owner', () => {
       const { id } = mount()
-      const screenId = useDesktop.getState().openWindow({ appId: 'basic-screen' })
-      render(<BasicScreen windowId={screenId} args={{ owner: id }} />)
+      mountScreen(id)
       expect($('.bscreen-canvas')).toBeTruthy()
     })
 
@@ -236,9 +353,7 @@ describe('BASIC app', () => {
 
     it('feeds what is typed on it to INKEY$', () => {
       const { id } = mount()
-      const screenId = useDesktop.getState().openWindow({ appId: 'basic-screen' })
-      render(<BasicScreen windowId={screenId} args={{ owner: id }} />)
-      const surface = $$('.bscreen').at(-1)!
+      const surface = mountScreen(id)
 
       fireEvent.keyDown(surface, { key: 'q' })
       expect(getSession(id)?.takeKey()).toBe('q')
@@ -386,15 +501,15 @@ describe('BASIC app', () => {
     }
 
     it('runs the program on F5', async () => {
-      mount()
+      const { id } = mount()
       setSource('PRINT "BY KEY"')
       await press('F5')
       await pump()
-      expect(consoleText()).toContain('BY KEY')
+      expect(screenText(id)).toContain('BY KEY')
     })
 
     it('stops a running program on Escape', async () => {
-      mount()
+      const { id } = mount()
       setSource('10 GOTO 10')
       await press('F5')
       await pump(3)
@@ -402,14 +517,14 @@ describe('BASIC app', () => {
 
       await press('Escape')
       expect(state()).toBe('done')
-      expect(consoleText()).toContain('Break')
+      expect(screenText(id)).toContain('Break')
     })
 
     it('ignores Escape when nothing is running', async () => {
-      mount()
+      const { id } = mount()
       await press('Escape')
       expect(state()).toBe('ready')
-      expect(consoleText()).not.toContain('Break')
+      expect(screenText(id)).not.toContain('Break')
     })
 
     it('does not restart a program already running on F5', async () => {
@@ -421,29 +536,26 @@ describe('BASIC app', () => {
       await press('F5')
       await pump(3)
       expect(state()).toBe(vmBefore)
-      // A restart would have cleared the console; a no-op leaves it alone.
       expect(state()).toBe('running')
     })
 
     it('lets the screen window run its program with F5', async () => {
       const { id } = mount()
       setSource('PRINT "FROM SCREEN"')
-      const screenId = useDesktop.getState().openWindow({ appId: 'basic-screen' })
-      render(<BasicScreen windowId={screenId} args={{ owner: id }} />)
+      const surface = mountScreen(id)
 
       await act(async () => {
-        fireEvent.keyDown($$('.bscreen').at(-1)!, { key: 'F5' })
+        fireEvent.keyDown(surface, { key: 'F5' })
       })
       await pump()
-      expect(consoleText()).toContain('FROM SCREEN')
+      expect(screenText(id)).toContain('FROM SCREEN')
     })
 
     it('still gives Escape to INKEY$ on the screen window', () => {
       const { id } = mount()
-      const screenId = useDesktop.getState().openWindow({ appId: 'basic-screen' })
-      render(<BasicScreen windowId={screenId} args={{ owner: id }} />)
+      const surface = mountScreen(id)
 
-      fireEvent.keyDown($$('.bscreen').at(-1)!, { key: 'Escape' })
+      fireEvent.keyDown(surface, { key: 'Escape' })
       expect(getSession(id)?.takeKey()).toBe('')
     })
   })
