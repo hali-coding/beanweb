@@ -34,11 +34,12 @@ describe('desktop shell', () => {
     render(<Desktop />)
     expect($('.b-desktop')).toBeTruthy()
     expect($('.b-deskbar')).toBeTruthy()
-    expect($$('.b-desktop-icon')).toHaveLength(4)
+    expect($$('.b-desktop-icon')).toHaveLength(5)
     expect($$('.b-desktop-icon-label').map((n) => n.textContent)).toEqual([
       'beanweb',
       'home',
       'Terminal',
+      'Coffee Shop',
       'Trash',
     ])
     await waitFor(() => expect(titles()).toEqual(['home']))

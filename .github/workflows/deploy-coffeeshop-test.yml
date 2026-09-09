@@ -1,0 +1,26 @@
+name: Deploy Coffee Shop backend to test
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'coffeeshop/**'
+      - '.github/workflows/deploy-coffeeshop-reusable.yml'
+      - '.github/workflows/deploy-coffeeshop-test.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-${{ github.workflow }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    uses: ./.github/workflows/deploy-coffeeshop-reusable.yml
+    with:
+      environment_name: test
+      deploy_path: /var/www/beanweb-coffeeshop-test/
+      port: '8081'
+    secrets: inherit

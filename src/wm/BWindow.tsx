@@ -1,4 +1,5 @@
 import { memo, useCallback, useEffect, useRef, useState } from 'react'
+import { useContextMenu } from '@/widgets/Menu'
 import { selectWindow, useDesktop } from '@/store/desktop'
 import { useApps } from '@/apps/registry'
 import { useViewport } from './useViewport'
@@ -22,8 +23,10 @@ function BWindowImpl({ id, active, front }: Props) {
   const requestClose = useDesktop((s) => s.requestClose)
   const focusWindow = useDesktop((s) => s.focusWindow)
   const toggleZoom = useDesktop((s) => s.toggleZoom)
+  const minimizeWindow = useDesktop((s) => s.minimizeWindow)
   const viewport = useViewport()
   const apps = useApps()
+  const context = useContextMenu()
 
   const elRef = useRef<HTMLDivElement>(null)
   const [tabOffset, setTabOffset] = useState(0)
@@ -63,6 +66,18 @@ function BWindowImpl({ id, active, front }: Props) {
     [requestClose, id],
   )
 
+  // The tab's own menu: what its two widgets do, plus the one thing the tab
+  // has no widget for. Zoom and Close go through the same handlers the boxes
+  // use, so Close is still `requestClose` and an unsaved document still asks.
+  const onTabContext = (e: React.MouseEvent) => {
+    context.open(e, [
+      { label: 'Zoom', onSelect: () => toggleZoom(id, viewport) },
+      { label: 'Hide', onSelect: () => minimizeWindow(id, true) },
+      { separator: true },
+      { label: 'Close', shortcut: 'Alt+W', onSelect: () => void requestClose(id) },
+    ])
+  }
+
   if (!win) return null
 
   // Through the subscription rather than getApp(): this component is memoised,
@@ -101,6 +116,7 @@ function BWindowImpl({ id, active, front }: Props) {
           style={{ marginLeft: tabOffset }}
           onPointerDown={onTabPointerDown}
           onDoubleClick={onZoom}
+          onContextMenu={onTabContext}
         >
           <button
             type="button"
@@ -119,6 +135,7 @@ function BWindowImpl({ id, active, front }: Props) {
           />
         </div>
       </div>
+      {context.menu}
 
       <div className="b-window-frame">
         <div className="b-window-content">

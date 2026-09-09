@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useRef, useState } from 'react'
-import { MenuBar } from '@/widgets/Menu'
-import type { MenuDef } from '@/widgets/Menu'
+import { MenuBar, useContextMenu } from '@/widgets/Menu'
+import type { MenuDef, MenuItem } from '@/widgets/Menu'
 import { ScrollView } from '@/widgets/controls'
 import { FolderIcon, TextFileIcon, AppIcon, TrackerIcon } from '@/lib/icons'
 import type { FsNode } from '@/store/fs'
@@ -43,6 +43,7 @@ export function Tracker({ windowId, args }: AppProps) {
   const [mode, setMode] = useState<ViewMode>('icon')
   const [selected, setSelected] = useState<string | null>(null)
   const [dropping, setDropping] = useState(false)
+  const context = useContextMenu()
 
   // `dragleave` fires every time the pointer crosses into a child, so a plain
   // boolean flickers off mid-drag. Count enters against leaves instead.
@@ -96,22 +97,32 @@ export function Tracker({ windowId, args }: AppProps) {
     mkdir(joinPath(path, name))
   }, [mkdir, nodes, path])
 
-  const deleteSelected = useCallback(async () => {
-    if (!selected) return
-    const node = nodes[selected]
-    if (!node) return
-    const answer = await showAlert(
-      'warn',
-      'Tracker',
-      `Delete "${node.name}"?\nThis cannot be undone.`,
-      ['Cancel', 'Delete'],
-      1,
-    )
-    if (answer === 1) {
-      remove(selected)
-      setSelected(null)
-    }
-  }, [nodes, remove, selected, showAlert])
+  /**
+   * Takes the path rather than reading `selected`.
+   *
+   * A right-click selects the item under the pointer and opens the menu in the
+   * same handler, so a menu item closed over `selected` would still be holding
+   * the *previous* selection when it ran -- the state has not committed yet.
+   * Passing the path is what makes both routes act on the same file.
+   */
+  const trashNode = useCallback(
+    async (target: string) => {
+      const node = nodes[target]
+      if (!node) return
+      const answer = await showAlert(
+        'warn',
+        'Tracker',
+        `Delete "${node.name}"?\nThis cannot be undone.`,
+        ['Cancel', 'Delete'],
+        1,
+      )
+      if (answer === 1) {
+        remove(target)
+        setSelected((current) => (current === target ? null : current))
+      }
+    },
+    [nodes, remove, showAlert],
+  )
 
   const onDragEnter = useCallback((e: React.DragEvent) => {
     if (!e.dataTransfer.types.includes('Files')) return
@@ -146,6 +157,54 @@ export function Tracker({ windowId, args }: AppProps) {
   const atRoot = path === '/'
   const exportable = Boolean(selected && nodes[selected]?.kind === 'text')
 
+  // Right-click menus. Both are built from the same callbacks the menu bar
+  // uses, so an action cannot behave differently depending on how it was
+  // reached -- the reason `lib/disk.ts` owns its own confirmation too.
+  const menuForNode = useCallback(
+    (node: FsNode): MenuItem[] => [
+      { label: 'Open', onSelect: () => openNode(node) },
+      ...(node.kind === 'dir'
+        ? [
+            {
+              label: 'Open Terminal here',
+              onSelect: () => launchApp('terminal', { cwd: node.path }),
+            },
+          ]
+        : []),
+      ...(node.kind === 'text'
+        ? [{ label: 'Export…', onSelect: () => exportNode(node.path) }]
+        : []),
+      { separator: true },
+      { label: 'Move to Trash', onSelect: () => void trashNode(node.path) },
+    ],
+    [openNode, trashNode],
+  )
+
+  const backgroundMenu: MenuItem[] = useMemo(
+    () => [
+      { label: 'New folder', shortcut: 'Alt+N', onSelect: newFolder },
+      { label: 'Import…', onSelect: () => void importFromHost(path) },
+      { separator: true },
+      { label: 'Open Terminal here', onSelect: () => launchApp('terminal', { cwd: path }) },
+      { label: 'Parent folder', disabled: atRoot, onSelect: () => navigate(dirname(path)) },
+      { separator: true },
+      { label: 'Icon view', checked: mode === 'icon', onSelect: () => setMode('icon') },
+      { label: 'List view', checked: mode === 'list', onSelect: () => setMode('list') },
+    ],
+    [atRoot, mode, navigate, newFolder, path],
+  )
+
+  // Right-clicking an item selects it first: every item action reads
+  // `selected`, and a menu acting on a different file than the one under the
+  // pointer is the worst thing a file manager can do.
+  const onItemContext = useCallback(
+    (e: React.MouseEvent, node: FsNode) => {
+      setSelected(node.path)
+      context.open(e, menuForNode(node))
+    },
+    [context, menuForNode],
+  )
+
   const menus: MenuDef[] = useMemo(
     () => [
       {
@@ -158,7 +217,11 @@ export function Tracker({ windowId, args }: AppProps) {
             disabled: !selected,
             onSelect: () => selected && nodes[selected] && openNode(nodes[selected]),
           },
-          { label: 'Move to Trash', disabled: !selected, onSelect: deleteSelected },
+          {
+            label: 'Move to Trash',
+            disabled: !selected,
+            onSelect: () => selected && void trashNode(selected),
+          },
           { separator: true },
           { label: 'Import…', onSelect: () => void importFromHost(path) },
           {
@@ -190,7 +253,7 @@ export function Tracker({ windowId, args }: AppProps) {
         ],
       },
     ],
-    [atRoot, requestClose, deleteSelected, exportable, mode, navigate, newFolder, nodes, openNode, path, selected, windowId],
+    [atRoot, requestClose, trashNode, exportable, mode, navigate, newFolder, nodes, openNode, path, selected, windowId],
   )
 
   return (
@@ -217,7 +280,10 @@ export function Tracker({ windowId, args }: AppProps) {
         <span className="tracker-path b-fixed">{path}</span>
       </div>
 
-      <ScrollView className={`tracker-view tracker-view--${mode}`}>
+      <ScrollView
+        className={`tracker-view tracker-view--${mode}`}
+        onContextMenu={(e) => context.open(e, backgroundMenu)}
+      >
         {entries.length === 0 ? (
           <p className="tracker-empty">This folder is empty.</p>
         ) : mode === 'icon' ? (
@@ -229,6 +295,7 @@ export function Tracker({ windowId, args }: AppProps) {
               data-selected={selected === node.path}
               onClick={() => setSelected(node.path)}
               onDoubleClick={() => openNode(node)}
+              onContextMenu={(e) => onItemContext(e, node)}
             >
               {iconFor(node, 32)}
               <span className="tracker-icon-label">{node.name}</span>
@@ -250,6 +317,7 @@ export function Tracker({ windowId, args }: AppProps) {
                   data-selected={selected === node.path}
                   onClick={() => setSelected(node.path)}
                   onDoubleClick={() => openNode(node)}
+                  onContextMenu={(e) => onItemContext(e, node)}
                 >
                   <td>
                     <span className="tracker-cell-name">
@@ -265,6 +333,8 @@ export function Tracker({ windowId, args }: AppProps) {
           </table>
         )}
       </ScrollView>
+
+      {context.menu}
 
       <div className="tracker-status b-fixed">
         {entries.length} item{entries.length === 1 ? '' : 's'}

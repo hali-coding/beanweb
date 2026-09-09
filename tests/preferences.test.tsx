@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { act, fireEvent, render, waitFor } from '@testing-library/react'
 import '@/apps' // side-effect: registers every app
 import { Desktop } from '@/shell/Desktop'
+import { launchApp } from '@/apps/registry'
 import { useFs } from '@/store/fs'
 import { useSettings } from '@/store/settings'
 
@@ -44,6 +45,44 @@ describe('Preferences', () => {
 
     await waitFor(() => expect($$('.prefs')).toHaveLength(1))
     expect($$('.b-window')).toHaveLength(after)
+  })
+
+  it('switches the Deskbar clock between 12- and 24-hour', async () => {
+    // Fixed at an afternoon minute, so the two formats are unmistakably
+    // different: 13:42 has no meridiem and 1:42 PM cannot be read as 24-hour.
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date(2026, 0, 15, 13, 42))
+    try {
+      useSettings.setState({ clock: '12h' })
+      render(<Desktop />)
+      expect($('.b-deskbar-clock')?.textContent).toMatch(/PM|pm/)
+
+      // Launched directly rather than through the Deskbar: `launch()` waits,
+      // and waitFor needs the real clock this test has taken away.
+      act(() => void launchApp('preferences'))
+      expect(radio('12-hour').checked).toBe(true)
+
+      fireEvent.click(radio('24-hour'))
+      expect(useSettings.getState().clock).toBe('24h')
+      expect($('.b-deskbar-clock')?.textContent).toBe('13:42')
+      expect($('.b-deskbar-clock')?.textContent).not.toMatch(/PM|pm/)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('keeps the clock format across a reload of the store', async () => {
+    // The setting is persisted like the theme: the record is written debounced,
+    // so let the timer run before reading it back.
+    vi.useFakeTimers()
+    try {
+      useSettings.getState().setClock('24h')
+      vi.advanceTimersByTime(300)
+      await vi.runAllTimersAsync()
+      expect(JSON.parse(localStorage.getItem('beanweb.settings.v1')!).clock).toBe('24h')
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('shows the current theme and switches it', async () => {

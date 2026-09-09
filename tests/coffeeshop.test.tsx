@@ -64,6 +64,13 @@ function pkgBytes(over: Partial<PackageManifest> = {}): Uint8Array {
   return writePackage(contents)
 }
 
+/* A listing's own artwork, the thing Browse leads with. Deliberately carries
+   an `onload` so the sanitiser's work is visible in the assertion below: the
+   icon is markup from a stranger rendered into this page. */
+const ICON =
+  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" onload="alert(1)">' +
+  '<rect x="4" y="4" width="24" height="24" fill="#c05"/></svg>'
+
 const LISTING = {
   id: PKG,
   name: 'Bean Paint',
@@ -73,6 +80,7 @@ const LISTING = {
   description: 'A longer pitch for Bean Paint.\n\nWith a second paragraph.',
   publisher: 'Example',
   sizeBytes: 1234,
+  iconSvg: ICON,
 }
 
 function mockBackend(bytes: Uint8Array) {
@@ -121,23 +129,44 @@ describe('Coffee Shop — Browse', () => {
     render(<Desktop />)
     await launch('Coffee Shop')
 
-    await waitFor(() => expect(byText('.coffeeshop-table td', 'Bean Paint')).toBeTruthy())
-    fireEvent.click(byText('.coffeeshop-table tr', 'Bean Paint'))
+    await waitFor(() => expect(byText('.coffeeshop-card', 'Bean Paint')).toBeTruthy())
+    fireEvent.click(byText('.coffeeshop-card', 'Bean Paint'))
 
     await waitFor(() => expect(byText('.coffeeshop-specs dd', 'Example')).toBeTruthy())
     expect(byText('.coffeeshop-specs dd', 'A small painting program.')).toBeTruthy()
     expect($('.coffeeshop-description')?.textContent).toBe(LISTING.description)
   })
 
+  it('says on screen what the window is', async () => {
+    // The tab reads "Coffee Shop", which names the app without saying what it
+    // is for; the banner is the sentence under it.
+    render(<Desktop />)
+    await launch('Coffee Shop')
+    expect($('.coffeeshop-banner h1')?.textContent).toBe('Coffee Shop')
+    expect($('.coffeeshop-banner p')?.textContent).toMatch(/BeanWeb app store/)
+  })
+
+  it("leads with the package's own artwork, sanitised", async () => {
+    mockBackend(pkgBytes())
+    render(<Desktop />)
+    await launch('Coffee Shop')
+
+    await waitFor(() => expect(byText('.coffeeshop-card', 'Bean Paint')).toBeTruthy())
+    const art = $('.coffeeshop-card-art svg')!
+    expect(art).toBeTruthy()
+    expect(art.querySelector('rect')?.getAttribute('fill')).toBe('#c05')
+    expect(art.getAttribute('onload')).toBeNull()
+  })
+
   it('searches the backend by query', async () => {
     mockBackend(pkgBytes())
     render(<Desktop />)
     await launch('Coffee Shop')
-    await waitFor(() => expect(byText('.coffeeshop-table td', 'Bean Paint')).toBeTruthy())
+    await waitFor(() => expect(byText('.coffeeshop-card', 'Bean Paint')).toBeTruthy())
 
     fireEvent.change($('.coffeeshop-search input')!, { target: { value: 'nothing-matches' } })
     fireEvent.submit($('.coffeeshop-search')!)
-    await waitFor(() => expect($('.coffeeshop-table')).toBeFalsy())
+    await waitFor(() => expect($('.coffeeshop-grid')).toBeFalsy())
     expect($('.coffeeshop-empty')?.textContent).toMatch(/nothing-matches/)
   })
 
@@ -145,8 +174,8 @@ describe('Coffee Shop — Browse', () => {
     mockBackend(pkgBytes())
     render(<Desktop />)
     await launch('Coffee Shop')
-    await waitFor(() => expect(byText('.coffeeshop-table td', 'Bean Paint')).toBeTruthy())
-    fireEvent.click(byText('.coffeeshop-table tr', 'Bean Paint'))
+    await waitFor(() => expect(byText('.coffeeshop-card', 'Bean Paint')).toBeTruthy())
+    fireEvent.click(byText('.coffeeshop-card', 'Bean Paint'))
 
     fireEvent.click(byText('.coffeeshop-actions .b-button', 'Install'))
     await waitFor(() => expect($('.b-alert')).toBeTruthy())
@@ -185,8 +214,8 @@ describe('Coffee Shop — Installed', () => {
     )
     goInstalled()
 
-    await waitFor(() => expect($('.coffeeshop-table')).toBeTruthy())
-    const row = byText('.coffeeshop-table tbody tr', 'Bean Paint')
+    await waitFor(() => expect($('.coffeeshop-rows')).toBeTruthy())
+    const row = byText('.coffeeshop-row', 'Bean Paint')
     expect(row).toBeTruthy()
 
     fireEvent.click(row)
@@ -203,8 +232,8 @@ describe('Coffee Shop — Installed', () => {
     await launch('Coffee Shop')
     await install(pkgBytes())
     goInstalled()
-    await waitFor(() => expect(byText('.coffeeshop-table tbody tr', 'Bean Paint')).toBeTruthy())
-    fireEvent.click(byText('.coffeeshop-table tbody tr', 'Bean Paint'))
+    await waitFor(() => expect(byText('.coffeeshop-row', 'Bean Paint')).toBeTruthy())
+    fireEvent.click(byText('.coffeeshop-row', 'Bean Paint'))
 
     fireEvent.click(byText('.coffeeshop-actions .b-button', 'Remove'))
     await waitFor(() => expect($('.b-alert')).toBeTruthy())
@@ -212,6 +241,28 @@ describe('Coffee Shop — Installed', () => {
 
     await waitFor(() => expect(getApp(PKG)).toBeUndefined())
     expect($('.coffeeshop-empty')?.textContent).toMatch(/Nothing is installed yet/)
+  })
+
+  it('opens the sandbox explainer from Help, and says what a package cannot do', async () => {
+    // The one thing a store owes a user before they run a stranger's code.
+    // Its own window, so it can carry the link to the examples; launched by
+    // id, so nothing here imports the help app.
+    render(<Desktop />)
+    await launch('Coffee Shop')
+
+    fireEvent.pointerDown(byText('.b-window--active .b-menubar-item', 'Help'))
+    await waitFor(() => expect($('.b-menu')).toBeTruthy())
+    fireEvent.click(byText('.b-menu-item', 'About Packages…'))
+
+    await waitFor(() => expect($('.pkghelp')).toBeTruthy())
+    const text = $('.pkghelp')!.textContent!
+    expect(text).toMatch(/allow-scripts/)
+    expect(text).toMatch(/without/)
+    expect(text).toMatch(/allow-same-origin/)
+    expect(text).toMatch(/connect-src 'none'/)
+    expect($<HTMLAnchorElement>('.pkghelp-link')?.href).toBe(
+      'https://github.com/hali-coding/beanweb/tree/main/pkgs',
+    )
   })
 
   it('offers a File menu item for every non-browsable source', async () => {

@@ -71,6 +71,10 @@ it is allowed to read.
 
 The entry script runs at the end of `<body>`, so `document.body` exists.
 
+Coffee Shop says all of this to the user in *Help → About Packages*. That
+window is this section in plain words, so a change here belongs in
+`src/apps/PackageHelp.tsx` too.
+
 ## Permissions
 
 `permissions` is what a package asks the host to do on its behalf. It is
@@ -135,7 +139,10 @@ special access*, which is a thing worth saying out loud. Cancel is a real
 answer; nothing is written until Install is pressed.
 
 After that, Coffee Shop's *Installed* tab carries the same list under
-**Access**, so the ask is answerable later and not only in the moment.
+**Access**, so the ask is answerable later and not only in the moment. Its
+*Help → About Packages* window is the third telling: what a package can never
+do, and what each grant actually reaches, for someone deciding before there is
+a package selected at all.
 Installing over an existing package re-asks with the *new* manifest's list, so
 a version that wants more has to be agreed to again.
 
@@ -149,6 +156,9 @@ a version that wants more has to be agreed to again.
    dispatch — `FS_VERBS` is the pattern. Refuse at the door, so a half-done
    operation is not a state the host can be left in.
 3. A row in the table above.
+4. A line in *What it may ask for* in `src/apps/PackageHelp.tsx`. That window
+   is the only description of the grant a user reads outside the install
+   confirmation; a permission missing from it is one nobody was told about.
 
 Older BeanWebs will treat it as an unknown entry and not grant it, which is the
 behaviour that makes adding one safe.

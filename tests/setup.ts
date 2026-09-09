@@ -3,7 +3,7 @@ import { cleanup } from '@testing-library/react'
 import { useDesktop } from '@/store/desktop'
 import { useFs } from '@/store/fs'
 import { usePackages } from '@/store/packages'
-import { useSettings } from '@/store/settings'
+import { DEFAULT_CLOCK, useSettings } from '@/store/settings'
 import { DEFAULT_MODEL } from '@/lib/models'
 
 /**
@@ -52,7 +52,7 @@ beforeEach(() => {
   useFs.getState().reset()
   // Explicit literal, not a reset() action: a new persisted field keeps its
   // previous value across tests until it is added here.
-  useSettings.setState({ apiKey: '', model: DEFAULT_MODEL, theme: 'light' })
+  useSettings.setState({ apiKey: '', model: DEFAULT_MODEL, theme: 'light', clock: DEFAULT_CLOCK })
   usePackages.setState({ installed: [] })
   document.documentElement.removeAttribute('data-theme')
 })

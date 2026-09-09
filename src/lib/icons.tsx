@@ -272,6 +272,23 @@ export function PrefsIcon({ size = 32, className }: IconProps) {
 }
 
 /** A steaming to-go cup: the app store, Coffee Shop. */
+/**
+ * The parcel behind Coffee Shop's *Help → About Packages*: a package with a
+ * shield over it, because what that window is about is the sandbox rather
+ * than the archive.
+ */
+export function PackageHelpIcon({ size = 32, className }: IconProps) {
+  return (
+    <svg {...box(size)} className={className}>
+      <path d="M4 10h24v18H4z" fill="#c9a06a" stroke="#5b4324" strokeWidth="1.5" strokeLinejoin="round" />
+      <path d="M3 5h26v5H3z" fill="#e0bd8c" stroke="#5b4324" strokeWidth="1.5" strokeLinejoin="round" />
+      <path d="M13 5h6v23h-6z" fill="#a8763f" stroke="#5b4324" strokeWidth="1.5" strokeLinejoin="round" />
+      <path d="M22 13l6 2.5V20c0 4-2.6 6.8-6 8-3.4-1.2-6-4-6-8v-4.5z" fill="#63b06b" stroke="#204a26" strokeWidth="1.5" strokeLinejoin="round" />
+      <path d="M19.6 20.4l2 2 3.6-4.2" fill="none" stroke="#e9f7ea" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  )
+}
+
 export function CoffeeShopIcon({ size = 32, className }: IconProps) {
   return (
     <svg {...box(size)} className={className}>

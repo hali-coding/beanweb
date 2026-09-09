@@ -1,15 +1,20 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import { LeafIcon } from '@/lib/icons'
-import { MenuPanel } from '@/widgets/Menu'
-import type { MenuItem } from '@/widgets/Menu'
-import { getApp, launchApp, useApps } from '@/apps/registry'
+import { MenuPanel, useContextMenu } from '@/widgets/Menu'
+import { getApp } from '@/apps/registry'
 import { useDesktop } from '@/store/desktop'
+import { useSettings } from '@/store/settings'
 import { useViewport } from '@/wm/useViewport'
+import { useAppMenuItems } from './appMenu'
 
 /** Ticks once a second, isolated so the rest of the Deskbar never re-renders. */
 function Clock() {
   const [now, setNow] = useState(() => new Date())
+  // `hourCycle`, not `hour12: false`: the h11/h24 cycles write midnight as
+  // "24:00", which is a legal reading of the same flag and not the one anyone
+  // means by a 24-hour clock.
+  const hourCycle = useSettings((s) => (s.clock === '12h' ? 'h12' : 'h23'))
 
   useEffect(() => {
     // Align the first tick to the next whole second so the display never
@@ -29,7 +34,7 @@ function Clock() {
   return (
     <>
       <time className="b-deskbar-clock" dateTime={now.toISOString()}>
-        {now.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}
+        {now.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', hourCycle })}
       </time>
       <span className="b-deskbar-date">
         {now.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
@@ -56,29 +61,13 @@ export function Deskbar() {
   const activeId = useDesktop((s) => s.activeId)
   const focusWindow = useDesktop((s) => s.focusWindow)
   const minimizeWindow = useDesktop((s) => s.minimizeWindow)
-  const beginShutdown = useDesktop((s) => s.beginShutdown)
+  const requestClose = useDesktop((s) => s.requestClose)
+  const context = useContextMenu()
 
+  // The same list the desktop's own right-click shows -- see shell/appMenu.ts.
   // Subscribed, not read once: installing a package registers an app after
   // this component has mounted, and a memo over a stable action never re-runs.
-  const apps = useApps()
-
-  const items: MenuItem[] = useMemo(
-    () => [
-      ...apps
-        .filter((app) => !app.hidden)
-        .map((app) => ({
-          label: app.name,
-          onSelect: () => launchApp(app.id),
-        })),
-      { separator: true },
-      { label: 'About BeanWeb…', onSelect: () => launchApp('about') },
-      { separator: true },
-      // R5 spelled these without an ellipsis even though both can stop to ask.
-      { label: 'Restart', onSelect: () => void beginShutdown('restart') },
-      { label: 'Shut Down', onSelect: () => void beginShutdown('shutdown') },
-    ],
-    [apps, beginShutdown],
-  )
+  const items = useAppMenuItems()
 
   const onAppClick = useCallback(
     (id: string, minimized: boolean) => {
@@ -127,6 +116,18 @@ export function Deskbar() {
               data-active={win.id === activeId && !win.minimized}
               title={win.title}
               onClick={() => onAppClick(win.id, win.minimized)}
+              onContextMenu={(e) =>
+                context.open(e, [
+                  {
+                    label: win.minimized ? 'Show' : 'Hide',
+                    onSelect: () => onAppClick(win.id, win.minimized),
+                  },
+                  { separator: true },
+                  // Through requestClose, so an app holding unsaved work still
+                  // gets to ask -- the rule the whole desktop closes windows by.
+                  { label: 'Close', onSelect: () => void requestClose(win.id) },
+                ])
+              }
             >
               {Icon ? <Icon size={16} className="b-deskbar-app-icon" /> : null}
               <span className="b-deskbar-app-name">{win.title}</span>
@@ -143,6 +144,7 @@ export function Deskbar() {
           onClose={() => setMenuAnchor(null)}
         />
       ) : null}
+      {context.menu}
     </div>
   )
 }

@@ -1,0 +1,85 @@
+/* About Packages: Coffee Shop's help window. A page of prose in labelled
+   boxes -- the shape Preferences uses -- rather than a wall of text, so the
+   three questions it answers stay separable. */
+
+.pkghelp {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  overflow: auto;
+  background: var(--panel);
+}
+
+.pkghelp-hero {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.pkghelp-title {
+  margin: 0;
+  font-size: 18px;
+  line-height: 20px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+.pkghelp-sub {
+  margin: 2px 0 0;
+  font-size: var(--fs-small);
+  line-height: 13px;
+  color: var(--panel-text-dim);
+}
+
+.pkghelp .b-box { flex: none; }
+
+.pkghelp-p {
+  margin: 0 0 7px;
+  font-size: var(--fs-plain);
+  line-height: 16px;
+}
+.pkghelp-p:last-child { margin-bottom: 0; }
+.pkghelp-note { color: var(--panel-text-dim); }
+
+/* Inline code is the one place this window names something exactly -- an
+   attribute, a header, a path -- and it has to be readable as a literal. */
+.pkghelp code {
+  font-family: var(--font-fixed);
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+
+.pkghelp-grants {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 5px 12px;
+  margin: 0 0 7px;
+  font-size: var(--fs-plain);
+  line-height: 16px;
+}
+.pkghelp-grants dt { color: var(--panel-text-dim); white-space: nowrap; }
+.pkghelp-grants dd { margin: 0; min-width: 0; }
+
+/* Borrowed from About, and for the same reason: R5 had no hypertext in a
+   window like this, so a link wears the navigation colour rather than a
+   palette of its own. */
+.pkghelp-link {
+  color: var(--navigation);
+  text-decoration: underline;
+  overflow-wrap: anywhere;
+}
+.pkghelp-link:focus-visible {
+  outline: calc(2 * var(--hairline)) solid var(--navigation);
+  outline-offset: 1px;
+}
+
+.pkghelp-buttons {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: auto;
+  padding-top: 4px;
+}
