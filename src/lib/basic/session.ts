@@ -26,15 +26,34 @@ export interface BasicSession {
   screenWindow: WindowId | null
 
   /**
-   * F5 and Stop, installed by the editor window.
+   * F5, Stop and the answer to an INPUT, installed by the editor window.
    *
-   * The screen window has no Run button, and F5 pressed over it would reload
-   * the tab, so it needs a way to reach the editor's controls. They are plain
-   * mutable fields for the same reason `screen` is: reassigning them must not
-   * re-render anything.
+   * The screen window has no Run button, F5 pressed over it would reload the
+   * tab, and the interpreter it must answer lives in the editor. They are
+   * plain mutable fields for the same reason `screen` is: reassigning them
+   * must not re-render anything.
    */
   run: () => void
   stop: () => void
+  /** Hand a finished INPUT line to the interpreter waiting for it. */
+  submitInput: (value: string) => void
+
+  /**
+   * How many questions the program has asked. The screen window anchors its
+   * echo on this rather than on a change in `status`, because two INPUTs in a
+   * row never produce one: the editor mirrors its React state here, and
+   * answering a question that leads straight to another takes that state
+   * awaiting-input -> running -> awaiting-input inside a single event, which
+   * React coalesces into no change at all — no render, no notify, and nothing
+   * downstream ever hears that a second question was asked.
+   */
+  inputGeneration: number
+  /**
+   * The program is asking: it has written its prompt and the cursor is where
+   * the answer goes. `status` is set here rather than left to the editor's
+   * mirror for the reason above.
+   */
+  beginInput(): void
 
   /** Queue a keystroke for INKEY$ and for a bare SLEEP to find. */
   pressKey(key: string): void
@@ -72,6 +91,14 @@ export function createSession(id: WindowId, name: string): BasicSession {
     // No-ops until the editor window's effect installs the real ones.
     run: () => {},
     stop: () => {},
+    submitInput: () => {},
+
+    inputGeneration: 0,
+    beginInput: () => {
+      session.status = 'awaiting-input'
+      session.inputGeneration += 1
+      session.notify()
+    },
 
     pressKey: (key) => {
       keys.push(key)

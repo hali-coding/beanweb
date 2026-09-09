@@ -21,7 +21,7 @@ FOR i = 1 TO 5
   PRINT i; "squared is"; i * i
 NEXT i
 
-' Graphics open a screen window of their own.
+' Text and graphics share the one screen window.
 SCREEN 13
 FOR i = 0 TO 60
   CIRCLE (160, 100), 100 - i, 32 + i
@@ -29,9 +29,6 @@ NEXT i
 LINE (0, 0)-(319, 199), 15, B
 LOCATE 24, 12: PRINT "BEANWEB BASIC";
 `
-
-/** Console scrollback cap: a runaway PRINT loop must not eat all the memory. */
-const MAX_OUTPUT = 40000
 
 const KEYWORDS_HELP = `Statements: PRINT, INPUT, LET, DIM, CONST, DATA/READ/RESTORE, IF/THEN/ELSE, SELECT CASE, FOR/NEXT/STEP, WHILE/WEND, DO/LOOP/UNTIL, GOTO, GOSUB/RETURN, SUB/FUNCTION/CALL, SWAP, RANDOMIZE, CLS, END/STOP
 
@@ -41,11 +38,32 @@ Functions: LEN, LEFT$/RIGHT$/MID$, CHR$/ASC, VAL/STR$, UCASE$/LCASE$, INSTR, ABS
 
 Sound (parsed, silent): BEEP, SOUND, PLAY, SLEEP`
 
+/** The gap between the listing and its screen, in the R5 desktop's pixels. */
+const SCREEN_GAP = 8
+
+/**
+ * Put the screen window beside the listing rather than on top of it.
+ *
+ * The cascade drops each new window a step down and to the right, which for
+ * these two means the editor covers the one window the program is talking to.
+ * If there is no room to the right the cascade stands — and below the 768px
+ * breakpoint it always does, since every window there is full-bleed anyway.
+ */
+function placeScreen(editorId: string, screenId: string): void {
+  const { windows, commitRect } = useDesktop.getState()
+  const editor = windows[editorId]
+  const screen = windows[screenId]
+  if (!editor || !screen) return
+
+  const x = editor.rect.x + editor.rect.w + SCREEN_GAP
+  if (x + screen.rect.w > window.innerWidth) return
+  commitRect(screenId, { ...screen.rect, x, y: editor.rect.y })
+}
+
 export function Basic({ windowId, args }: AppProps) {
   const [path, setPath] = useState<string | null>(args?.path ?? null)
   const [source, setSource] = useState(STARTER)
   const [dirty, setDirty] = useState(false)
-  const [output, setOutput] = useState('')
   const [status, setStatus] = useState<Status>('ready')
   const [errorLine, setErrorLine] = useState<number | null>(null)
 
@@ -59,41 +77,34 @@ export function Basic({ windowId, args }: AppProps) {
   const isActive = useDesktop((s) => s.activeId === windowId)
 
   /**
-   * The link to the screen window. Created once per BASIC window and kept
-   * across runs, so the screen window stays attached to the same `Screen`
-   * object while every Run builds a fresh interpreter around it.
+   * The link to the screen window — the program's whole output, text and
+   * pixels together. Created once per BASIC window and kept across runs, so
+   * the screen window stays attached to the same `Screen` object while every
+   * Run builds a fresh interpreter around it.
    */
   const session = useMemo(() => createSession(windowId, 'Untitled.bas'), [windowId])
 
   const editorRef = useRef<HTMLTextAreaElement>(null)
-  const consoleRef = useRef<HTMLDivElement>(null)
-  const inputRef = useRef<HTMLInputElement>(null)
   const vmRef = useRef<Interpreter | null>(null)
   const timerRef = useRef<number | undefined>(undefined)
 
-  /* --- output buffering -------------------------------------------------
-     A program can print far faster than the screen can update. The host
-     appends into a ref and the pump flushes once per slice, so output costs
-     one render per slice rather than one per PRINT. */
-  const pendingRef = useRef('')
-
   /**
-   * `show` is the only surprising one: the interpreter calls it the first time
-   * a program touches the screen, and again on every SCREEN mode change, so
-   * the screen window opens exactly when a program turns out to need it and
-   * never for a program that only prints.
+   * `print` and `cls` have nothing to do here: the interpreter writes text
+   * into `session.screen` itself, and the screen window is the only place a
+   * program's output is shown. They stay on `Host` because they are what a
+   * headless test observes — `recordingHost` is how the runtime is tested with
+   * no DOM at all.
+   *
+   * `show` is the one that still does something. The interpreter calls it when
+   * a program starts drawing and again on every SCREEN mode change, which is
+   * where a screen window the user closed by hand comes back.
    */
   const host = useMemo<Host>(
     () => ({
-      print: (text) => {
-        pendingRef.current += text
-      },
-      cls: () => {
-        pendingRef.current = ''
-        setOutput('')
-      },
+      print: () => {},
+      cls: () => {},
       show: () => {
-        openScreenRef.current()
+        openScreenRef.current(false)
       },
       inkey: () => session.takeKey(),
     }),
@@ -101,33 +112,33 @@ export function Basic({ windowId, args }: AppProps) {
   )
 
   /**
-   * Show the screen window, reusing the one already open for this program.
+   * Make sure this program has a screen window, and hand it the keyboard only
+   * when the user asked for it by name. A window reopened underneath a running
+   * program must not steal the caret out of the listing, so everything but
+   * *Show screen* passes `focus: false` and puts focus back where it was.
    *
    * Held in a ref because `host` must not be rebuilt when it changes: a new
    * host identity would rebuild `run`, and a Run in flight reads the host it
    * started with.
    */
-  const openScreen = useCallback(() => {
-    const existing = session.screenWindow
-    if (existing && useDesktop.getState().windows[existing]) {
-      useDesktop.getState().focusWindow(existing)
-      return
-    }
-    session.screenWindow = launchApp('basic-screen', { owner: windowId }, `${session.name} — Screen`)
-  }, [session, windowId])
+  const openScreen = useCallback(
+    (focus: boolean) => {
+      const existing = session.screenWindow
+      if (existing && useDesktop.getState().windows[existing]) {
+        if (focus) useDesktop.getState().focusWindow(existing)
+        return
+      }
+      const opened = launchApp('basic-screen', { owner: windowId }, `${session.name} — Screen`)
+      session.screenWindow = opened
+      if (opened) placeScreen(windowId, opened)
+      // openWindow focuses whatever it opened; the listing is where typing goes.
+      if (!focus) useDesktop.getState().focusWindow(windowId)
+    },
+    [session, windowId],
+  )
 
   const openScreenRef = useRef(openScreen)
   openScreenRef.current = openScreen
-
-  const flushOutput = useCallback(() => {
-    const text = pendingRef.current
-    if (!text) return
-    pendingRef.current = ''
-    setOutput((prev) => {
-      const next = prev + text
-      return next.length > MAX_OUTPUT ? next.slice(next.length - MAX_OUTPUT) : next
-    })
-  }, [])
 
   useEffect(() => {
     if (path) {
@@ -149,9 +160,11 @@ export function Basic({ windowId, args }: AppProps) {
     session.notify()
   }, [session, status])
 
-  // A BASIC window's screen belongs to it: closing one closes the other.
+  // A BASIC window's screen belongs to it: it opens with the window, and
+  // closing one closes the other.
   useEffect(() => {
     attachSession(windowId, session)
+    openScreenRef.current(false)
     return () => {
       const screenWindow = session.screenWindow
       if (screenWindow) useDesktop.getState().closeWindow(screenWindow)
@@ -159,17 +172,12 @@ export function Basic({ windowId, args }: AppProps) {
     }
   }, [session, windowId])
 
-  // Keep the newest console output in view.
+  // A question takes the keyboard to the screen — see `pump`, which is the
+  // only place that can count them — and the end of a program brings the caret
+  // back to the listing.
   useEffect(() => {
-    const el = consoleRef.current
-    if (el) el.scrollTop = el.scrollHeight
-  }, [output])
-
-  // Focus the INPUT box the moment a program asks for something.
-  useEffect(() => {
-    if (status === 'awaiting-input') inputRef.current?.focus()
-    else if (isActive && status === 'ready') editorRef.current?.focus()
-  }, [status, isActive])
+    if (isActive && status === 'ready') editorRef.current?.focus()
+  }, [isActive, status])
 
   const clearTimer = useCallback(() => {
     if (timerRef.current !== undefined) {
@@ -190,7 +198,6 @@ export function Basic({ windowId, args }: AppProps) {
     if (!vm) return
 
     const next = vm.runSlice({ budgetMs: 8 })
-    flushOutput()
     setStatus(next)
 
     if (next === 'running') {
@@ -200,19 +207,32 @@ export function Basic({ windowId, args }: AppProps) {
       return
     }
 
+    if (next === 'awaiting-input') {
+      // Every question is announced here, where the slice that asked it ends.
+      // A question asked from a loop settles React back on the status it
+      // already had, so nothing that watches `status` can count them.
+      session.beginInput()
+      const screenWindow = session.screenWindow
+      if (screenWindow) useDesktop.getState().focusWindow(screenWindow)
+      return
+    }
+
     if (next === 'error' && vm.error) {
       setErrorLine(vm.error.line)
-      setOutput((prev) => `${prev}\n${vm.error?.toString()}\n`)
+      // The screen is the only transcript there is, so an error has to be
+      // legible on it; the status line says which row, not what went wrong.
+      session.screen.write(`\n${vm.error.toString()}\n`)
     }
-  }, [flushOutput])
+  }, [session])
 
   const run = useCallback(() => {
     clearTimer()
-    setOutput('')
     setErrorLine(null)
-    pendingRef.current = ''
-
     session.clearKeys()
+    // Everything the program says lands on the screen, so it has to be there
+    // before the program says anything. What is already on it stays: QBasic
+    // never wiped the screen between runs, which is what CLS is for.
+    openScreenRef.current(false)
 
     let vm: Interpreter
     try {
@@ -221,7 +241,7 @@ export function Basic({ windowId, args }: AppProps) {
       // A parse error never starts the program; report it and point at the line.
       const e = err instanceof BasicError ? err : new BasicError(String(err))
       setErrorLine(e.line)
-      setOutput(`${e.toString()}\n`)
+      session.screen.write(`\n${e.toString()}\n`)
       setStatus('error')
       return
     }
@@ -235,23 +255,24 @@ export function Basic({ windowId, args }: AppProps) {
   const stop = useCallback(() => {
     clearTimer()
     vmRef.current?.stop()
-    flushOutput()
     setStatus('done')
-    setOutput((prev) => `${prev}\nBreak\n`)
-  }, [clearTimer, flushOutput])
+    session.screen.write('\nBreak\n')
+  }, [clearTimer, session])
 
+  /**
+   * An answer typed on the screen window. It was echoed there as it was typed,
+   * so nothing is written back here — the interpreter adds only the newline
+   * that ends the line.
+   */
   const submitInput = useCallback(
     (value: string) => {
       const vm = vmRef.current
       if (!vm) return
-      // Echo what was typed, the way a real console does.
-      pendingRef.current += `${value}\n`
       vm.resumeInput(value)
-      flushOutput()
       setStatus(vm.status)
       pump()
     },
-    [flushOutput, pump],
+    [pump],
   )
 
   /* ------------------------------------------------------------ file I/O */
@@ -306,7 +327,6 @@ export function Basic({ windowId, args }: AppProps) {
       setSource(text)
       setPath(target)
       setDirty(false)
-      setOutput('')
       setErrorLine(null)
       setStatus('ready')
     },
@@ -356,7 +376,7 @@ export function Basic({ windowId, args }: AppProps) {
           { label: 'Run', shortcut: 'F5', disabled: running, onSelect: run },
           { label: 'Stop', shortcut: 'Esc', disabled: !running, onSelect: stop },
           { separator: true },
-          { label: 'Show screen', onSelect: openScreen },
+          { label: 'Show screen', onSelect: () => openScreen(true) },
         ],
       },
       {
@@ -407,11 +427,13 @@ export function Basic({ windowId, args }: AppProps) {
     [openProgram, run, running, save, stop],
   )
 
-  // The screen window has no Run button of its own, so it drives these.
+  // The screen window has no Run button of its own and no interpreter to
+  // hand an answer to, so it reaches all three through here.
   useEffect(() => {
     session.run = run
     session.stop = stop
-  }, [session, run, stop])
+    session.submitInput = submitInput
+  }, [session, run, stop, submitInput])
 
   // Gutter numbering follows the editor's own lines, not BASIC line numbers.
   const lineCount = Math.max(source.split('\n').length, 1)
@@ -461,49 +483,6 @@ export function Basic({ windowId, args }: AppProps) {
               : status}
         </span>
       </div>
-
-      <div className="basic-console b-scroll" ref={consoleRef}>
-        <pre className="basic-output selectable">{output}</pre>
-        {status === 'awaiting-input' ? (
-          <ConsoleInput
-            prompt={vmRef.current?.pendingInput?.prompt ?? '?'}
-            inputRef={inputRef}
-            onSubmit={submitInput}
-          />
-        ) : null}
-      </div>
-    </div>
-  )
-}
-
-function ConsoleInput({
-  prompt,
-  inputRef,
-  onSubmit,
-}: {
-  prompt: string
-  inputRef: React.RefObject<HTMLInputElement | null>
-  onSubmit: (value: string) => void
-}) {
-  const [value, setValue] = useState('')
-  return (
-    <div className="basic-input-row">
-      <span className="basic-prompt">{prompt}?</span>
-      <input
-        ref={inputRef}
-        className="basic-input"
-        value={value}
-        spellCheck={false}
-        autoComplete="off"
-        aria-label="Program input"
-        onChange={(e) => setValue(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key !== 'Enter') return
-          e.preventDefault()
-          onSubmit(value)
-          setValue('')
-        }}
-      />
     </div>
   )
 }

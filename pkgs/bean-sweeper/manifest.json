@@ -1,0 +1,15 @@
+{
+  "format": 1,
+  "id": "com.beanweb.beansweeper",
+  "name": "Bean Sweeper",
+  "version": "1.0.0",
+  "kind": "sandboxed",
+  "entry": "main.js",
+  "publisher": "BeanWeb",
+  "summary": "Minesweeper with beans: clear the field without turning one over.",
+  "description": "A Minesweeper tribute where the hidden hazards are beans. Uncover every square that is not a bean; a number counts the beans touching that square, and a flag marks one you are sure of.\n\nBeginner, Intermediate and Expert fields, the classic chord click on a satisfied number, and a first click that is always safe. Best times are kept in the package's own folder.",
+  "icon": "icon.svg",
+  "window": { "defaultW": 460, "defaultH": 430, "minW": 300, "minH": 260 },
+  "singleton": true,
+  "permissions": ["fs"]
+}

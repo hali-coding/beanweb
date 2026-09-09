@@ -123,7 +123,7 @@ jobs:
                 echo "healthy"
                 exit 0
               fi
-              sleep 2
+              sleep 5
             done
             echo "coffeeshop container did not become healthy in time" >&2
             docker compose logs --tail=50 coffeeshop >&2

@@ -152,7 +152,8 @@ describe('Terminal', () => {
     await launch('Terminal')
     const before = $$('.b-window').length
     await run('basic basic/hello.bas')
-    await waitFor(() => expect($$('.b-window')).toHaveLength(before + 1))
+    // Two: BASIC brings its screen window up with it.
+    await waitFor(() => expect($$('.b-window')).toHaveLength(before + 2))
     expect($<HTMLTextAreaElement>('.basic-source')!.value).toContain('HELLO, WORLD')
   })
 
