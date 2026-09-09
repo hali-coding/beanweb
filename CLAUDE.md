@@ -591,6 +591,26 @@ window because installing was already one function neither app owned
   row, reading whichever pane is active, rather than two of each. *Browse* is
   the one shown on launch — this is a store first, and what is already on the
   disk is a click away rather than the default.
+- **A banner says what the window is** (`.coffeeshop-banner`): the Coffee
+  Shop icon, the name, and one line naming it as BeanWeb's app store. The
+  window tab carries the name alone, which tells someone who has never opened
+  it nothing; the sentence under it is the only place the app says what it is
+  for.
+- **The two panes are drawn differently, because they answer different
+  questions.** *Browse* is a shelf — a grid of cards (`.coffeeshop-grid` /
+  `.coffeeshop-card`), each the package's *own* 48px icon over its name and
+  publisher, with a yellow **Installed** badge on anything already on the
+  disk — because artwork is all there is to go on before a package is yours.
+  *Installed* is an inventory (`.coffeeshop-rows` / `.coffeeshop-row`): 32px
+  icon, name, and one dim line of version, size and date, because by then the
+  question is *which one*, not *what is it*. Both were one table of 16px
+  glyphs once, which served neither. Every icon in both panes goes through
+  `packageIcon`, never a generic glyph and never raw markup.
+- **The artwork is sized by its frame, not by the SVG.** `packageIcon` wraps
+  a package's markup in a fixed-size span but cannot reach inside it, so a
+  32-unit icon would paint 32px in a 48px card; the `-art` boxes stretch the
+  svg to fill instead. A card's name is clamped to exactly two lines so the
+  meta line under it stays on one baseline across the row.
 - **`summary` and `description` are both optional and both shown, for
   different jobs.** `summary` is the one line that fits in the detail pane
   under **About**; `description` is the longer pitch under **Description**,
@@ -615,6 +635,17 @@ window because installing was already one function neither app owned
   `packageIcon`, never inlined directly — one sanitiser for every SVG that
   reaches the desktop from outside it. *Installed* renders the same helper
   over `InstalledPackage.iconSvg`, so both panes' rows carry artwork.
+- **Help → *About Packages* is the sandbox explained to the user**
+  (`apps/PackageHelp.tsx`): `allow-scripts` without `allow-same-origin`,
+  `connect-src 'none'`, what the `fs` grant does and does not reach, and the
+  one document a file-type claim hands over — then links to `pkgs/` for
+  working source and `docs/packages.md` for the format. A window rather than
+  an alert, for About BeanWeb's reason: it is a page to read and it carries
+  links, where an alert is a question. Hidden from the Deskbar and launched
+  by id (`launchApp('packagehelp')`), never imported, so one app does not
+  pull another's module in for a string. `docs/packages.md` stays the
+  reference, but this window is the only version of it a user ever reads —
+  when the enforcement moves, move both.
 - **The backend is `coffeeshop/`**, a standalone Node service with its own
   `package.json`, `README.md` and `node --test` suite — liftable into its own
   repository unchanged, same as `pkgs/`. It scans a directory of `.pkg` files
@@ -715,7 +746,8 @@ element**. Everything above them — metrics, the `--z-*` ladder, and
 ## Preferences
 
 `apps/Preferences.tsx` is the settings panel: an **Appearance** box holding the
-light/dark radios, and a **Disk** box holding the node count and *Reset disk…*.
+light/dark radios, a **Clock** box holding the 12/24-hour radios, and a **Disk**
+box holding the node count and *Reset disk…*.
 R5 kept one preflet per setting in a Preferences folder; there is not enough
 here for a folder, so this is one panel of labelled `Box`es — the shape a
 preflet had, with more than one box in it.
@@ -732,8 +764,22 @@ preflet had, with more than one box in it.
   a destructive action's wording must not drift between the two places that
   offer it. It reads the stores through `getState()` for the same reason
   `launchApp` does: it is an action, not a subscription.
+- **The clock setting defaults to the locale's own habit**, resolved once as
+  `DEFAULT_CLOCK` in `store/settings.ts` rather than written as a constant.
+  Picking either literal would have changed the time under half the people who
+  never open this panel; the setting exists to *disagree* with the locale, so
+  the locale is what it starts from. Because the default is computed,
+  `tests/setup.ts` resets to `DEFAULT_CLOCK` too — the same shape `model` uses
+  with `DEFAULT_MODEL`.
+- **The Deskbar formats with `hourCycle`, never `hour12: false`.** The h24
+  cycle is a legal reading of that flag and writes midnight as `24:00`, which
+  is not what anyone means by a 24-hour clock; `h12`/`h23` say it exactly. The
+  radio labels carry a live sample of the current time in each format, so the
+  choice is shown rather than described — a still, not a second clock: this
+  panel owns no timer.
 - The radio `name` comes from `useId()`. The app is a singleton today, but a
-  second window would otherwise share the first one's radio group.
+  second window would otherwise share the first one's radio group. The Clock
+  box has a group of its own, or the two boxes' radios would be one set.
 
 ## Responsive strategy
 
@@ -829,6 +875,25 @@ because the project has no backend to proxy through.
   without handling it.
 - Menus render through a portal into `document.body` so window `overflow:
   hidden` cannot clip them.
+- **Right-click is one mechanism, `useContextMenu()` in `widgets/Menu.tsx`.**
+  It hands `MenuPanel` a zero-size `DOMRect` at the pointer, so the panel's own
+  measure-and-nudge keeps a menu opened in the bottom corner on screen. `open`
+  also stops propagation, which is what lets a Tracker item's menu win over the
+  folder background behind it without either knowing about the other. The
+  places wired today: the desktop (the Be menu, as R5 did), a desktop icon,
+  a Tracker item and a Tracker's empty space, a window tab, and a Deskbar
+  entry.
+- **Only override the native menu where there is something better.** A text
+  field keeps the browser's, because ours cannot paste — the clipboard is the
+  browser's to give — and replacing it would take away the one item the user
+  opened it for. The desktop's handler is guarded with `e.target ===
+  e.currentTarget` for the same reason: an event that merely bubbled up out of
+  a window or an input is not the desktop's to answer.
+- **A context-menu action takes what it acts on, never what is selected.**
+  Right-clicking a file selects it and opens the menu in one handler, so an
+  item closed over `selected` still holds the *previous* selection when it
+  runs — Tracker's delete deleted the wrong file until it became
+  `trashNode(path)`. `tests/contextmenu.test.tsx` keeps that honest.
 - **Click-to-focus needs `preventDefault()`.** Calling `.focus()` from a
   `pointerdown` handler on a non-focusable element is not enough: the browser's
   default `mousedown` action then moves focus to the body and undoes it. The
@@ -836,6 +901,17 @@ because the project has no backend to proxy through.
   `preventDefault` when the click lands on output text so selection still
   works. jsdom does not implement that default blur, so this class of bug
   passes a headless test and only shows up in a real browser.
+- **The desktop icon column is a literal in `shell/DesktopIcons.tsx`**, not a
+  view of the filesystem: beanweb, home, Terminal, Coffee Shop, Trash, on a
+  fixed 76px pitch down the left edge. An app earns a place there by being one
+  a user reaches for cold — the store is one, which is why it sits above Trash
+  rather than only in the Deskbar menu. **Trash keeps the foot of the column**,
+  so anything new is inserted above it and Trash moves down.
+- **A desktop icon's label wraps to two lines; it does not ellipsise.**
+  `Coffee Shop` on one 72px line came out `Coffee S…`, which reads as a
+  different name. The clamp is two lines because the pitch is fixed, and a
+  single overlong word still breaks and then clips. jsdom has no layout, so
+  nothing in the suite can catch a regression here — check it in a browser.
 - **Stacking is a fixed ladder** of `--z-*` tokens (icons 10, windows 100,
   Deskbar 9500, menu 9800, alert 9900). `.b-window-layer` establishes a stacking
   context at 100, so per-window z values compete only with each other and can

@@ -3,7 +3,7 @@ import { PrefsIcon } from '@/lib/icons'
 import { Box, Button, RadioButton } from '@/widgets/controls'
 import { confirmResetDisk } from '@/lib/disk'
 import { useFs } from '@/store/fs'
-import { useSettings } from '@/store/settings'
+import { useSettings, type ClockFormat } from '@/store/settings'
 import { registerApp } from './registry'
 import './preferences.css'
 
@@ -16,15 +16,32 @@ import './preferences.css'
  * Revert, because nothing is being staged: picking Dark drops the curtain
  * immediately, and Reset asks for confirmation on its own.
  */
+/**
+ * "1:42 PM" / "13:42" -- the current time in the format the radio offers, so
+ * the choice is shown rather than described. It is a still, not a clock: this
+ * panel has no timer, and a sample that ticks would be a second thing to keep
+ * alive for no gain.
+ */
+function sample(format: ClockFormat): string {
+  return new Date().toLocaleTimeString(undefined, {
+    hour: 'numeric',
+    minute: '2-digit',
+    hourCycle: format === '12h' ? 'h12' : 'h23',
+  })
+}
+
 export function Preferences() {
   const theme = useSettings((s) => s.theme)
   const setTheme = useSettings((s) => s.setTheme)
+  const clock = useSettings((s) => s.clock)
+  const setClock = useSettings((s) => s.setClock)
   const nodeCount = useFs((s) => Object.keys(s.nodes).length)
 
   // Radios only group within a name, and a second window would otherwise share
   // this one's group. The app is a singleton today; this keeps it correct if
   // that ever changes.
   const group = useId()
+  const clockGroup = useId()
 
   return (
     <div className="prefs b-scroll">
@@ -48,6 +65,29 @@ export function Preferences() {
         <p className="prefs-note">
           The desktop changes behind a curtain, so it is never caught
           half-repainted.
+        </p>
+      </Box>
+
+      <Box label="Clock">
+        <div className="prefs-choices" role="radiogroup" aria-label="Clock">
+          <RadioButton
+            name={clockGroup}
+            label={`12-hour (${sample('12h')})`}
+            value="12h"
+            checked={clock === '12h'}
+            onChange={() => setClock('12h')}
+          />
+          <RadioButton
+            name={clockGroup}
+            label={`24-hour (${sample('24h')})`}
+            value="24h"
+            checked={clock === '24h'}
+            onChange={() => setClock('24h')}
+          />
+        </div>
+        <p className="prefs-note">
+          How the Deskbar writes the time. Until you choose, it follows this
+          browser's own locale.
         </p>
       </Box>
 
@@ -78,7 +118,7 @@ registerApp({
   component: Preferences,
   icon: PrefsIcon,
   defaultW: 360,
-  defaultH: 302,
+  defaultH: 430,
   minW: 300,
   minH: 260,
   singleton: true,

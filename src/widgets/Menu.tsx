@@ -100,6 +100,40 @@ export function MenuPanel({ items, anchor, onClose, align = 'below' }: MenuPanel
   )
 }
 
+/**
+ * A menu opened by the pointer instead of by a menu bar.
+ *
+ * `open(event, items)` cancels the browser's own menu and puts ours at the
+ * pointer, as a zero-size anchor -- `MenuPanel` already measures itself and
+ * nudges back on screen, so a right-click in the bottom corner needs nothing
+ * extra here. It also stops propagation, so a nested target (a file in
+ * Tracker) wins over the container behind it (the folder's empty space)
+ * without either having to know about the other.
+ *
+ * Only override the native menu where there is something better to offer.
+ * Text inputs deliberately keep theirs: ours cannot paste -- the clipboard is
+ * the browser's to give -- so replacing it there would take away the one item
+ * the user wanted.
+ */
+export function useContextMenu() {
+  const [state, setState] = useState<{ items: MenuItem[]; anchor: DOMRect } | null>(null)
+
+  const open = useCallback((e: React.MouseEvent, items: MenuItem[]) => {
+    if (items.length === 0) return
+    e.preventDefault()
+    e.stopPropagation()
+    setState({ items, anchor: new DOMRect(e.clientX, e.clientY, 0, 0) })
+  }, [])
+
+  const close = useCallback(() => setState(null), [])
+
+  const menu = state ? (
+    <MenuPanel items={state.items} anchor={state.anchor} onClose={close} />
+  ) : null
+
+  return { open, close, menu }
+}
+
 /** A window's menu bar. Once open, hovering a sibling title switches menus. */
 export function MenuBar({ menus }: { menus: MenuDef[] }) {
   const [open, setOpen] = useState<number | null>(null)

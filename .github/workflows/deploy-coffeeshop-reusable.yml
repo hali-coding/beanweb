@@ -1,0 +1,132 @@
+name: Deploy Coffee Shop backend (reusable)
+
+# Ships coffeeshop/ -- docker-compose.yml included, since it's identical on
+# every target -- to the server. `docker compose up --build` then rebuilds
+# the image from the Dockerfile this rsync uploaded and (re)starts it against
+# the compose file uploaded alongside it. The host port is the one thing that
+# does differ per target, so it travels as the `port` input and is exported as
+# PORT for docker-compose.yml's `${PORT:-8080}` to pick up.
+
+on:
+  workflow_call:
+    inputs:
+      environment_name:
+        description: GitHub environment holding this target's SERVER_IP/SERVER_KEY secrets
+        required: true
+        type: string
+      remote_user:
+        description: SSH user on the remote server
+        required: false
+        type: string
+        default: github
+      deploy_path:
+        description: Remote directory holding coffeeshop's docker-compose.yml
+        required: true
+        type: string
+      port:
+        description: Host port to publish the coffeeshop container on
+        required: true
+        type: string
+
+jobs:
+  deploy:
+    name: ☕ Build and deploy Coffee Shop backend
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: ${{ inputs.environment_name }}
+
+    env:
+      BLUE: '\033[1;34m'
+      MAGENTA: '\033[1;35m'
+      YELLOW: '\033[1;33m'
+      CYAN: '\033[1;36m'
+      GREEN: '\033[1;32m'
+      RESET: '\033[0m'
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: coffeeshop/package-lock.json
+
+      - name: 📦 Install dependencies
+        working-directory: coffeeshop
+        run: |
+          echo -e "${BLUE}📦 Installing dependencies...${RESET}"
+          npm config set audit false
+          npm config set fund false
+          npm ci
+
+      - name: 🧪 Test
+        working-directory: coffeeshop
+        run: |
+          echo -e "${MAGENTA}🧪 Running the backend suite...${RESET}"
+          npm test
+          echo -e "${GREEN}✅ Tests passed!${RESET}"
+
+      - name: 🔐 Configure SSH
+        env:
+          SERVER_KEY: ${{ secrets.SERVER_KEY }}
+          SERVER_IP: ${{ secrets.SERVER_IP }}
+        run: |
+          echo -e "${YELLOW}🔐 Setting up SSH access...${RESET}"
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "$SERVER_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H "$SERVER_IP" >> ~/.ssh/known_hosts
+          echo -e "${GREEN}✅ SSH ready!${RESET}"
+
+      - name: 📤 Upload backend source
+        env:
+          SERVER_IP: ${{ secrets.SERVER_IP }}
+          REMOTE_USER: ${{ inputs.remote_user }}
+          DEPLOY_PATH: ${{ inputs.deploy_path }}
+        run: |
+          echo -e "${CYAN}📤 Uploading coffeeshop/ to ${SERVER_IP}:${DEPLOY_PATH}...${RESET}"
+          rsync -avz --delete \
+            --exclude 'node_modules' \
+            --exclude '*.test.mjs' \
+            -e "ssh -i ~/.ssh/deploy_key" \
+            coffeeshop/ "${REMOTE_USER}@${SERVER_IP}:${DEPLOY_PATH}"
+          echo -e "${GREEN}✅ Upload complete!${RESET}"
+
+      - name: 🔨 Rebuild and restart the container
+        env:
+          SERVER_IP: ${{ secrets.SERVER_IP }}
+          REMOTE_USER: ${{ inputs.remote_user }}
+          DEPLOY_PATH: ${{ inputs.deploy_path }}
+          PORT: ${{ inputs.port }}
+        run: |
+          echo -e "${MAGENTA}🔨 Rebuilding coffeeshop on ${SERVER_IP} (port ${PORT})...${RESET}"
+          ssh -i ~/.ssh/deploy_key "${REMOTE_USER}@${SERVER_IP}" \
+            "cd '${DEPLOY_PATH}' && PORT='${PORT}' docker compose up -d --build --remove-orphans"
+          echo -e "${GREEN}✅ Container restarted!${RESET}"
+
+      - name: 🩺 Verify container is healthy
+        env:
+          SERVER_IP: ${{ secrets.SERVER_IP }}
+          REMOTE_USER: ${{ inputs.remote_user }}
+          DEPLOY_PATH: ${{ inputs.deploy_path }}
+        run: |
+          echo -e "${CYAN}🩺 Waiting for the healthcheck...${RESET}"
+          ssh -i ~/.ssh/deploy_key "${REMOTE_USER}@${SERVER_IP}" bash -s -- "${DEPLOY_PATH}" <<'EOF'
+            set -e
+            cd "$1"
+            cid="$(docker compose ps -q coffeeshop)"
+            for _ in $(seq 1 15); do
+              status="$(docker inspect --format='{{.State.Health.Status}}' "$cid" 2>/dev/null || echo starting)"
+              if [ "$status" = "healthy" ]; then
+                echo "healthy"
+                exit 0
+              fi
+              sleep 2
+            done
+            echo "coffeeshop container did not become healthy in time" >&2
+            docker compose logs --tail=50 coffeeshop >&2
+            exit 1
+          EOF
+          echo -e "${GREEN}🎉 Deploy finished!${RESET}"

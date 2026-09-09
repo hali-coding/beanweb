@@ -1,5 +1,6 @@
 import { useCallback, useRef, useState } from 'react'
-import { DiskIcon, FolderIcon, TerminalIcon, TrashIcon } from '@/lib/icons'
+import { useContextMenu, type MenuItem } from '@/widgets/Menu'
+import { CoffeeShopIcon, DiskIcon, FolderIcon, TerminalIcon, TrashIcon } from '@/lib/icons'
 import type { IconProps } from '@/lib/icons'
 import { launchApp } from '@/apps/registry'
 import { useDesktop } from '@/store/desktop'
@@ -11,6 +12,8 @@ interface DeskIcon {
   x: number
   y: number
   open: () => void | Promise<void>
+  /** A folder icon offers a shell in it; the others have nothing to add. */
+  cwd?: string
 }
 
 const openTrash = () =>
@@ -26,6 +29,7 @@ const INITIAL: DeskIcon[] = [
     x: 16,
     y: 16,
     open: () => void launchApp('tracker', { path: '/' }, 'beanweb'),
+    cwd: '/',
   },
   {
     id: 'home',
@@ -34,6 +38,7 @@ const INITIAL: DeskIcon[] = [
     x: 16,
     y: 92,
     open: () => void launchApp('tracker', { path: '/boot/home' }, 'home'),
+    cwd: '/boot/home',
   },
   {
     id: 'terminal',
@@ -43,7 +48,16 @@ const INITIAL: DeskIcon[] = [
     y: 168,
     open: () => void launchApp('terminal'),
   },
-  { id: 'trash', label: 'Trash', Icon: TrashIcon, x: 16, y: 244, open: () => void openTrash() },
+  {
+    id: 'coffeeshop',
+    label: 'Coffee Shop',
+    Icon: CoffeeShopIcon,
+    x: 16,
+    y: 244,
+    open: () => void launchApp('coffeeshop'),
+  },
+  // Trash keeps the foot of the column, wherever the stack above it grows to.
+  { id: 'trash', label: 'Trash', Icon: TrashIcon, x: 16, y: 320, open: () => void openTrash() },
 ]
 
 /** True when the primary input has no hover, i.e. a touchscreen. */
@@ -52,6 +66,20 @@ const coarse = typeof window !== 'undefined' && window.matchMedia('(pointer: coa
 export function DesktopIcons() {
   const [icons, setIcons] = useState(INITIAL)
   const [selected, setSelected] = useState<string | null>(null)
+  const context = useContextMenu()
+
+  const menuFor = useCallback((icon: DeskIcon): MenuItem[] => {
+    const cwd = icon.cwd
+    return [
+      { label: 'Open', onSelect: () => void icon.open() },
+      ...(cwd
+        ? [
+            { separator: true },
+            { label: 'Open Terminal here', onSelect: () => void launchApp('terminal', { cwd }) },
+          ]
+        : []),
+    ]
+  }, [])
 
   // Same approach as windows: the DOM leads during the drag, state trails.
   const drag = useRef({ id: '', startX: 0, startY: 0, baseX: 0, baseY: 0, x: 0, y: 0, moved: false })
@@ -116,11 +144,16 @@ export function DesktopIcons() {
             onPointerDown(e, icon)
           }}
           onDoubleClick={() => void icon.open()}
+          onContextMenu={(e) => {
+            setSelected(icon.id)
+            context.open(e, menuFor(icon))
+          }}
         >
           <icon.Icon size={32} className="b-desktop-icon-glyph" />
           <span className="b-desktop-icon-label">{icon.label}</span>
         </button>
       ))}
+      {context.menu}
     </div>
   )
 }

@@ -29,6 +29,13 @@ import './coffeeshop.css'
  * `view` picks which pane is showing; the detail pane and the action row
  * below the list read whichever one is active, so there is one of each
  * rather than two.
+ *
+ * The two panes are drawn differently on purpose. Browse is a shelf -- a
+ * grid of cards, each one the package's *own* icon at 48px -- because
+ * artwork is what you have to go on before a package is yours. Installed is
+ * an inventory of rows, icon then name then figures, because by then you
+ * know what the thing is and are looking for one of them. A column of
+ * 16px glyphs beside a table served neither.
  */
 
 type View = 'browse' | 'installed'
@@ -171,6 +178,17 @@ export function CoffeeShop({ windowId }: AppProps) {
           { label: 'Close', shortcut: 'Alt+W', onSelect: () => void requestClose(windowId) },
         ],
       },
+      {
+        title: 'Help',
+        items: [
+          // The one thing a store owes a user before they install a stranger's
+          // code: what it will be able to do. Its own window rather than an
+          // alert, because it is a page with links in it -- see PackageHelp.
+          // Launched by id, like every other cross-app launch here: an
+          // import would pull one app's module into another's for a string.
+          { label: 'About Packages…', onSelect: () => launchApp('packagehelp') },
+        ],
+      },
     ],
     [busy, installFromSource, loading, query, refresh, requestClose, uploadSources, view, windowId],
   )
@@ -186,6 +204,16 @@ export function CoffeeShop({ windowId }: AppProps) {
   return (
     <div className="coffeeshop">
       <MenuBar menus={menus} />
+
+      {/* The window's tab says "Coffee Shop"; this says what a Coffee Shop
+          is, which a name on its own cannot. */}
+      <header className="coffeeshop-banner">
+        <CoffeeShopIcon size={32} className="coffeeshop-banner-icon" />
+        <div className="coffeeshop-banner-text">
+          <h1>Coffee Shop</h1>
+          <p>The BeanWeb app store — browse packages and install them onto this desk.</p>
+        </div>
+      </header>
 
       <div className="coffeeshop-tabs" role="tablist">
         <button
@@ -235,38 +263,35 @@ export function CoffeeShop({ windowId }: AppProps) {
               {query ? `Nothing matches "${query}".` : 'Nothing is listed yet.'}
             </p>
           ) : (
-            <table className="coffeeshop-table">
-              <thead>
-                <tr>
-                  <th />
-                  <th>Name</th>
-                  <th>Version</th>
-                  <th>Publisher</th>
-                  <th>Size</th>
-                </tr>
-              </thead>
-              <tbody>
-                {browseRows.map((listing) => {
-                  const RowIcon = packageIcon(listing.iconSvg)
-                  return (
-                    <tr
-                      key={listing.id}
-                      data-selected={selectedBrowseId === listing.id}
-                      onClick={() => setSelectedBrowseId(listing.id)}
-                      onDoubleClick={() => setSelectedBrowseId(listing.id)}
-                    >
-                      <td className="coffeeshop-icon">
-                        <RowIcon size={16} />
-                      </td>
-                      <td>{listing.name}</td>
-                      <td>{listing.version}</td>
-                      <td>{listing.publisher ?? '—'}</td>
-                      <td className="coffeeshop-num">{formatSize(listing.sizeBytes)}</td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
+            <div className="coffeeshop-grid">
+              {browseRows.map((listing) => {
+                const CardIcon = packageIcon(listing.iconSvg)
+                const onDisk = installedById.get(listing.id)
+                return (
+                  <button
+                    key={listing.id}
+                    type="button"
+                    className="coffeeshop-card"
+                    data-selected={selectedBrowseId === listing.id}
+                    aria-pressed={selectedBrowseId === listing.id}
+                    onClick={() => setSelectedBrowseId(listing.id)}
+                    onDoubleClick={() => {
+                      setSelectedBrowseId(listing.id)
+                      if (onDisk) launchApp(onDisk.manifest.id)
+                    }}
+                  >
+                    {onDisk ? <span className="coffeeshop-badge">Installed</span> : null}
+                    <span className="coffeeshop-card-art">
+                      <CardIcon size={48} />
+                    </span>
+                    <span className="coffeeshop-card-name">{listing.name}</span>
+                    <span className="coffeeshop-card-meta">
+                      {listing.publisher ?? `Version ${listing.version}`}
+                    </span>
+                  </button>
+                )
+              })}
+            </div>
           )}
         </div>
       ) : (
@@ -283,38 +308,33 @@ export function CoffeeShop({ windowId }: AppProps) {
               )}
             </p>
           ) : (
-            <table className="coffeeshop-table">
-              <thead>
-                <tr>
-                  <th />
-                  <th>Name</th>
-                  <th>Version</th>
-                  <th>Size</th>
-                  <th>Installed</th>
-                </tr>
-              </thead>
-              <tbody>
-                {installedRows.map((pkg) => {
-                  const RowIcon = packageIcon(pkg.iconSvg)
-                  return (
-                    <tr
-                      key={pkg.manifest.id}
-                      data-selected={selectedInstalledId === pkg.manifest.id}
-                      onClick={() => setSelectedInstalledId(pkg.manifest.id)}
-                      onDoubleClick={() => launchApp(pkg.manifest.id)}
-                    >
-                      <td className="coffeeshop-icon">
-                        <RowIcon size={16} />
-                      </td>
-                      <td>{pkg.manifest.name}</td>
-                      <td>{pkg.manifest.version}</td>
-                      <td className="coffeeshop-num">{formatSize(pkg.sizeBytes)}</td>
-                      <td>{formatDate(pkg.installedAt)}</td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
+            <div className="coffeeshop-rows">
+              {installedRows.map((pkg) => {
+                const RowIcon = packageIcon(pkg.iconSvg)
+                return (
+                  <button
+                    key={pkg.manifest.id}
+                    type="button"
+                    className="coffeeshop-row"
+                    data-selected={selectedInstalledId === pkg.manifest.id}
+                    aria-pressed={selectedInstalledId === pkg.manifest.id}
+                    onClick={() => setSelectedInstalledId(pkg.manifest.id)}
+                    onDoubleClick={() => launchApp(pkg.manifest.id)}
+                  >
+                    <span className="coffeeshop-row-art">
+                      <RowIcon size={32} />
+                    </span>
+                    <span className="coffeeshop-row-text">
+                      <span className="coffeeshop-row-name">{pkg.manifest.name}</span>
+                      <span className="coffeeshop-row-meta">
+                        Version {pkg.manifest.version} · {formatSize(pkg.sizeBytes)} · installed{' '}
+                        {formatDate(pkg.installedAt)}
+                      </span>
+                    </span>
+                  </button>
+                )
+              })}
+            </div>
           )}
         </div>
       )}
@@ -324,7 +344,9 @@ export function CoffeeShop({ windowId }: AppProps) {
           <Box label={currentListing ? currentListing.name : 'Package'}>
             {currentListing ? (
               <div className="coffeeshop-detail-body">
-                <BrowseIcon size={32} className="coffeeshop-detail-icon" />
+                <span className="coffeeshop-detail-icon">
+                  <BrowseIcon size={48} />
+                </span>
                 <dl className="coffeeshop-specs">
                   <dt>Publisher</dt>
                   <dd>{currentListing.publisher ?? 'Unknown'}</dd>
@@ -360,7 +382,9 @@ export function CoffeeShop({ windowId }: AppProps) {
           <Box label={currentInstalled ? currentInstalled.manifest.name : 'Package'}>
             {currentInstalled ? (
               <div className="coffeeshop-detail-body">
-                <InstalledIcon size={32} className="coffeeshop-detail-icon" />
+                <span className="coffeeshop-detail-icon">
+                  <InstalledIcon size={48} />
+                </span>
                 <dl className="coffeeshop-specs">
                   <dt>Publisher</dt>
                   <dd>{currentInstalled.manifest.publisher ?? 'Unknown'}</dd>
@@ -436,9 +460,9 @@ registerApp({
   name: 'Coffee Shop',
   component: CoffeeShop,
   icon: CoffeeShopIcon,
-  defaultW: 480,
-  defaultH: 440,
-  minW: 360,
-  minH: 320,
+  defaultW: 560,
+  defaultH: 520,
+  minW: 380,
+  minH: 340,
   singleton: true,
 })

@@ -3,6 +3,27 @@ import { DEFAULT_MODEL } from '@/lib/models'
 import { isSealed, seal, unseal, type Sealed } from '@/lib/keystore'
 import type { Theme } from '@/lib/theme'
 
+/** How the Deskbar writes the time. */
+export type ClockFormat = '12h' | '24h'
+
+/**
+ * What this locale already does, which is what the clock did before there was
+ * a setting. Used as the default so switching the desktop on for the first
+ * time never changes the time under someone -- the setting exists to disagree
+ * with the locale, not to impose a format on everyone who never opens it.
+ */
+function localeClockFormat(): ClockFormat {
+  try {
+    return new Intl.DateTimeFormat(undefined, { hour: 'numeric' }).resolvedOptions().hour12
+      ? '12h'
+      : '24h'
+  } catch {
+    return '24h'
+  }
+}
+
+export const DEFAULT_CLOCK: ClockFormat = localeClockFormat()
+
 /**
  * Desktop settings, persisted to localStorage.
  *
@@ -33,10 +54,12 @@ interface Persisted {
   model: string
   /** Light unless the user has said otherwise -- R5 only ever had the one. */
   theme: Theme
+  /** 12- or 24-hour Deskbar clock; the locale's own habit until changed. */
+  clock: ClockFormat
 }
 
 /**
- * What is actually written. The key is sealed and the other two are not:
+ * What is actually written. The key is sealed and the rest are not:
  * `index.html` reads the theme back before React boots to stamp the root, and
  * it cannot await a decrypt to do it.
  */
@@ -44,6 +67,7 @@ interface Record_ {
   key: Sealed | null
   model: string
   theme: Theme
+  clock: ClockFormat
 }
 
 function readRecord(): Partial<Record_> & { apiKey?: unknown } {
@@ -72,6 +96,7 @@ function load(): Persisted {
     apiKey: typeof parsed.apiKey === 'string' ? parsed.apiKey : '',
     model: typeof parsed.model === 'string' && parsed.model ? parsed.model : DEFAULT_MODEL,
     theme: parsed.theme === 'dark' ? 'dark' : 'light',
+    clock: parsed.clock === '12h' || parsed.clock === '24h' ? parsed.clock : DEFAULT_CLOCK,
   }
 }
 
@@ -91,7 +116,7 @@ async function writeRecord(state: Persisted, mine: number) {
   // session. Falling back to plain text is the one thing this must not do.
   const key = state.apiKey ? await seal(state.apiKey) : null
   if (mine !== generation) return
-  const record: Record_ = { key, model: state.model, theme: state.theme }
+  const record: Record_ = { key, model: state.model, theme: state.theme, clock: state.clock }
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(record))
   } catch {
@@ -105,6 +130,7 @@ interface SettingsStore extends Persisted {
   setModel: (model: string) => void
   setTheme: (theme: Theme) => void
   toggleTheme: () => void
+  setClock: (clock: ClockFormat) => void
 }
 
 /**
@@ -113,7 +139,7 @@ interface SettingsStore extends Persisted {
  * instead of remembering to thread it through each setter.
  */
 function snapshot(s: SettingsStore): Persisted {
-  return { apiKey: s.apiKey, model: s.model, theme: s.theme }
+  return { apiKey: s.apiKey, model: s.model, theme: s.theme, clock: s.clock }
 }
 
 export const useSettings = create<SettingsStore>((set, get) => {
@@ -132,6 +158,7 @@ export const useSettings = create<SettingsStore>((set, get) => {
     setModel: (model) => commit({ model }),
     setTheme: (theme) => commit({ theme }),
     toggleTheme: () => commit({ theme: get().theme === 'dark' ? 'light' : 'dark' }),
+    setClock: (clock) => commit({ clock }),
   }
 })
 

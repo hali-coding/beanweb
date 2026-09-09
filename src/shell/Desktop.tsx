@@ -1,6 +1,8 @@
 import { useEffect, useRef } from 'react'
 import { WindowLayer } from '@/wm/WindowLayer'
 import { launchApp } from '@/apps/registry'
+import { useContextMenu } from '@/widgets/Menu'
+import { useAppMenuItems } from './appMenu'
 import { Deskbar } from './Deskbar'
 import { DesktopIcons } from './DesktopIcons'
 import { Alerts } from './Alerts'
@@ -13,6 +15,8 @@ import { useShortcuts } from './useShortcuts'
 export function Desktop() {
   useShortcuts()
   const booted = useRef(false)
+  const context = useContextMenu()
+  const appItems = useAppMenuItems()
 
   // Open a Tracker on home the first time the desktop mounts, so the session
   // starts with something on screen. The ref survives StrictMode's double
@@ -39,10 +43,21 @@ export function Desktop() {
 
   return (
     <div className="b-desktop">
-      <div className="b-workspace">
+      <div
+        className="b-workspace"
+        // R5 put the Be menu under a right-click on the desktop, and this is
+        // that. Only when the workspace itself is the target: the icon layer
+        // above it is `pointer-events: none`, so empty desktop lands here,
+        // while a window, an icon or a text field has already handled its own
+        // and stopped the event.
+        onContextMenu={(e) => {
+          if (e.target === e.currentTarget) context.open(e, appItems)
+        }}
+      >
         <DesktopIcons />
         <WindowLayer />
       </div>
+      {context.menu}
       <Deskbar />
       <SavePanel />
       <KeyPanel />

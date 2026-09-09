@@ -34,9 +34,12 @@ npm test         # vitest + jsdom
 - **Tetris** — 7-bag randomiser, wall kicks, a landing shadow you can switch
   off, and the classic tetromino palette muted a shade to sit against R5 grey.
   Touch pad on phones.
-- **Coffee Shop** — the app store: browse a catalogue served by a small
-  backend, or install a `.pkg` file of your own, sandboxed so it can't reach
-  the desktop's storage or your API key. See *Building a package* below.
+- **Coffee Shop** — the app store, on the desktop and in the Deskbar menu.
+  *Browse* is a shelf of package artwork served by a small backend; *Installed*
+  is what is on the disk, with what each app is allowed to touch. Or install a
+  `.pkg` file of your own. Everything it installs runs sandboxed, and
+  *Help → About Packages* is that story in plain words. See *Building a
+  package* below.
 - **Claude** — a bare-bones chat client: streaming replies, stop mid-answer,
   multi-turn history, and a **Model** menu listing what your key can actually
   reach, priced and sorted cheapest first. Defaults to the cheapest model.
@@ -83,7 +86,10 @@ already builds, installs and runs — a working starting point to edit, not a
 stub. `build` packs it into `pkgs/dist/<id>.pkg`, ready to install.
 
 [docs/packages.md](docs/packages.md) is the format, the `bw` API a package
-runs against, and the permissions a user is asked to grant.
+runs against, and the permissions a user is asked to grant. Coffee Shop's
+*Help → About Packages* is the same ground for whoever is about to install
+one rather than write one, and [pkgs/](pkgs/) is working source to read:
+`iconedit` is a pixel editor in plain ES2020 with no build step.
 
 ## Keyboard
 
