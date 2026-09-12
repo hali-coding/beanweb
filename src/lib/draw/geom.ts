@@ -290,3 +290,60 @@ function ellipseToPath(e: EllipseShape): PathShape {
   ]
   return { id: shapeId('p'), kind: 'path', style: e.style, rotation: e.rotation, nodes, closed: true }
 }
+
+// ------------------------------------------------------------------ snapping
+
+/**
+ * The points a gesture may snap to.
+ *
+ * A path contributes its node anchors -- the end points of every segment,
+ * which is what one line wants to meet another at. Everything else
+ * contributes the four corners and the centre of the box its handles already
+ * draw, so a line can be pinned to a rectangle's corner without that
+ * rectangle first being converted to curves.
+ *
+ * Anchors come before boxes so that a node wins a tie against a corner lying
+ * on top of it: `nearestAnchor` keeps the first of two equal candidates.
+ * Rotation is applied here, because a snap target has to be where the shape
+ * is *drawn* -- for a path that is the anchor spun about its own centre, and
+ * `corners()` already does the same for a box.
+ */
+export function anchorPoints(shapes: readonly Shape[]): Point[] {
+  const nodes: Point[] = []
+  const boxes: Point[] = []
+  for (const s of shapes) {
+    if (s.kind === 'foreign') continue
+    if (s.kind === 'path') {
+      const c = centreOf(s)
+      for (const n of s.nodes) nodes.push(s.rotation ? rotatePoint(n.p, c, s.rotation) : { ...n.p })
+      continue
+    }
+    boxes.push(...corners(s), centreOf(s))
+  }
+  return [...nodes, ...boxes]
+}
+
+/**
+ * The candidate nearest `to`, or null if none is within `radius`.
+ *
+ * `radius` is in document units, so the caller divides a screen distance by
+ * the zoom and the snap feels the same size at every magnification.
+ */
+export function nearestAnchor(points: readonly Point[], to: Point, radius: number): Point | null {
+  let best: Point | null = null
+  let bestSq = radius * radius
+  for (const p of points) {
+    const dx = p.x - to.x
+    const dy = p.y - to.y
+    const sq = dx * dx + dy * dy
+    // Strictly nearer, so the earliest of two equal candidates wins.
+    if (sq < bestSq) {
+      bestSq = sq
+      best = p
+    }
+  }
+  return best ? { ...best } : null
+}
+
+/** Exactly the same point, as a snap produces: compared, never approximated. */
+export const samePoint = (a: Point, b: Point) => a.x === b.x && a.y === b.y

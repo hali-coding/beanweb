@@ -96,25 +96,92 @@ export function moveHandle(shape: PathShape, index: number, which: 'in' | 'out',
   return { ...shape, nodes }
 }
 
+/** How far a smoothed corner reaches toward each neighbour. */
+const NEIGHBOUR_PULL = 1 / 3
+
+/** The nodes either side of `index`, wrapping only if the path is closed. */
+function neighbours(shape: PathShape, index: number): { prev?: PathNode; next?: PathNode } {
+  const n = shape.nodes
+  const prev = index > 0 ? n[index - 1] : shape.closed ? n[n.length - 1] : undefined
+  const next = index < n.length - 1 ? n[index + 1] : shape.closed ? n[0] : undefined
+  // A closed path of one or two nodes would otherwise call a node its own
+  // neighbour and derive a zero-length tangent from itself.
+  return { prev: prev === n[index] ? undefined : prev, next: next === n[index] ? undefined : next }
+}
+
+/**
+ * Give a node with no handles at all a pair, aimed along the line from the
+ * node before it to the node after -- the smoothing every drawing program
+ * does. An endpoint of an open path has one neighbour and so gets the one
+ * handle it actually uses.
+ */
+function smoothCorner(shape: PathShape, index: number): PathNode {
+  const node = shape.nodes[index]
+  const { prev, next } = neighbours(shape, index)
+  const from = prev?.p ?? node.p
+  const to = next?.p ?? node.p
+  const dx = to.x - from.x
+  const dy = to.y - from.y
+  const len = Math.hypot(dx, dy)
+  if (len < 1e-6) return { ...node, smooth: true }
+  const ux = dx / len
+  const uy = dy / len
+  const back = prev ? Math.hypot(node.p.x - prev.p.x, node.p.y - prev.p.y) * NEIGHBOUR_PULL : 0
+  const ahead = next ? Math.hypot(next.p.x - node.p.x, next.p.y - node.p.y) * NEIGHBOUR_PULL : 0
+  // `back`/`ahead` are zero at an endpoint, and `-ux * 0` is -0 -- which is
+  // falsy everywhere it is tested but would still be written into a saved
+  // file as "-0". Keep the absent handle an honest zero.
+  return {
+    ...node,
+    smooth: true,
+    in: back ? { x: -ux * back, y: -uy * back } : { x: 0, y: 0 },
+    out: ahead ? { x: ux * ahead, y: uy * ahead } : { x: 0, y: 0 },
+  }
+}
+
+/**
+ * Make a node smooth, or return it to a cusp.
+ *
+ * A node that already has handles simply has them aligned -- becoming smooth
+ * has to actually align them, or the flag is a lie.
+ *
+ * A *corner* node has no handles at all, which is every node of a polygon, a
+ * converted rectangle and anything the polyline tool drew. This used to set
+ * the flag and stop: the path did not move, no grip appeared, and there was
+ * no way anywhere in the app to turn a straight line into a curve -- the one
+ * thing the node tool exists for. Such a node now takes its tangent from its
+ * neighbours instead.
+ */
 export function setNodeSmooth(shape: PathShape, index: number, smooth: boolean): PathShape {
-  const nodes = shape.nodes.map((n, i) => {
-    if (i !== index) return n
-    if (!smooth) return { ...n, smooth: false }
-    // Becoming smooth has to actually align the handles, or the flag is a lie.
-    const dx = n.out.x - n.in.x
-    const dy = n.out.y - n.in.y
+  const node = shape.nodes[index]
+  if (!node) return shape
+  if (!smooth) {
+    if (!node.smooth) return shape
+    return { ...shape, nodes: shape.nodes.map((n, i) => (i === index ? { ...n, smooth: false } : n)) }
+  }
+
+  const bare = !node.in.x && !node.in.y && !node.out.x && !node.out.y
+  let next: PathNode
+  if (bare) {
+    next = smoothCorner(shape, index)
+  } else {
+    const dx = node.out.x - node.in.x
+    const dy = node.out.y - node.in.y
     const len = Math.hypot(dx, dy)
-    if (len < 1e-6) return { ...n, smooth: true }
-    const inLen = Math.hypot(n.in.x, n.in.y) || len / 3
-    const outLen = Math.hypot(n.out.x, n.out.y) || len / 3
-    return {
-      ...n,
-      smooth: true,
-      in: { x: (-dx / len) * inLen, y: (-dy / len) * inLen },
-      out: { x: (dx / len) * outLen, y: (dy / len) * outLen },
+    if (len < 1e-6) {
+      next = { ...node, smooth: true }
+    } else {
+      const inLen = Math.hypot(node.in.x, node.in.y) || len / 3
+      const outLen = Math.hypot(node.out.x, node.out.y) || len / 3
+      next = {
+        ...node,
+        smooth: true,
+        in: { x: (-dx / len) * inLen, y: (-dy / len) * inLen },
+        out: { x: (dx / len) * outLen, y: (dy / len) * outLen },
+      }
     }
-  })
-  return { ...shape, nodes }
+  }
+  return { ...shape, nodes: shape.nodes.map((n, i) => (i === index ? next : n)) }
 }
 
 /**
