@@ -128,17 +128,306 @@ describe('Draw: tools and drawing', () => {
     expect($<SVGPathElement>('[data-id] path')!.getAttribute('d')).toBe('M 0 0 L 50 0 L 50 40')
   })
 
-  it('places a line of text where it was clicked', () => {
+  it('snaps a polyline point onto a nearby corner of an existing shape', () => {
+    mount()
+    fireEvent.click(tool('Rectangle'))
+    drag([10, 10], [110, 60])
+    fireEvent.click(tool('Polyline'))
+    // Four units off the rect's top-left corner, well inside the snap radius.
+    click(surface(), [14, 13])
+    click(surface(), [200, 200])
+    fireEvent.doubleClick(surface())
+    const line = $$<SVGPathElement>('[data-id] path').at(-1)!
+    expect(line.getAttribute('d')).toBe('M 10 10 L 200 200')
+  })
+
+  it('leaves a point alone when nothing is near enough to snap to', () => {
+    mount()
+    fireEvent.click(tool('Rectangle'))
+    drag([10, 10], [110, 60])
+    fireEvent.click(tool('Polyline'))
+    click(surface(), [40, 13])
+    click(surface(), [200, 200])
+    fireEvent.doubleClick(surface())
+    expect($$<SVGPathElement>('[data-id] path').at(-1)!.getAttribute('d')).toBe('M 40 13 L 200 200')
+  })
+
+  it('closes the polyline when the last click lands back on the first point', () => {
+    mount()
+    fireEvent.click(tool('Polyline'))
+    click(surface(), [0, 0])
+    click(surface(), [50, 0])
+    click(surface(), [50, 40])
+    // Near the start, not on it: the snap is what makes this a closing click.
+    click(surface(), [3, 2])
+    // It finishes there too -- no double-click, and no Object -> Close curve.
+    expect($<SVGPathElement>('[data-id] path')!.getAttribute('d')).toBe('M 0 0 L 50 0 L 50 40 Z')
+    expect($('.draw')!.getAttribute('data-tool')).toBe('pick')
+  })
+
+  it('does not leave a duplicate node under a double-click that finishes', () => {
+    mount()
+    fireEvent.click(tool('Polyline'))
+    click(surface(), [0, 0])
+    click(surface(), [50, 0])
+    // A real double-click presses once more on the point just placed first.
+    click(surface(), [50, 40])
+    click(surface(), [50, 40])
+    fireEvent.doubleClick(surface())
+    expect($<SVGPathElement>('[data-id] path')!.getAttribute('d')).toBe('M 0 0 L 50 0 L 50 40')
+  })
+
+  it('takes back the last polyline point on Backspace', () => {
+    mount()
+    fireEvent.click(tool('Polyline'))
+    click(surface(), [0, 0])
+    click(surface(), [50, 0])
+    click(surface(), [50, 40])
+    fireEvent.keyDown(window, { key: 'Backspace' })
+    fireEvent.keyDown(window, { key: 'Enter' })
+    expect($<SVGPathElement>('[data-id] path')!.getAttribute('d')).toBe('M 0 0 L 50 0')
+  })
+
+  it('does not leave the polyline rubber-band listener on the window', () => {
+    // The listener has to outlive the pointerup of its own click -- the band
+    // follows the pointer *between* clicks -- so nothing about its lifetime is
+    // a drag's. Two lines drawn without a move between them used to leave the
+    // first one's listener attached for the life of the tab, both of them then
+    // writing the same `cur`.
+    const add = vi.spyOn(window, 'addEventListener')
+    const remove = vi.spyOn(window, 'removeEventListener')
+    const live = () => {
+      const fns = new Set<unknown>()
+      for (const c of add.mock.calls) if (c[0] === 'pointermove') fns.add(c[1])
+      for (const c of remove.mock.calls) if (c[0] === 'pointermove') fns.delete(c[1])
+      return fns.size
+    }
+
+    const { unmount } = mount()
+    fireEvent.click(tool('Polyline'))
+    click(surface(), [0, 0])
+    click(surface(), [50, 0])
+    expect(live()).toBe(1)
+    fireEvent.doubleClick(surface())
+
+    // A second line begun before the pointer has moved: the first listener is
+    // still on the window and has had no chance to drop itself.
+    fireEvent.click(tool('Polyline'))
+    click(surface(), [0, 60])
+    click(surface(), [50, 60])
+    expect(live()).toBe(1)
+    fireEvent.doubleClick(surface())
+
+    unmount()
+    expect(live()).toBe(0)
+  })
+
+  it('places a line of text where it was clicked, ready to be typed over', () => {
     mount()
     fireEvent.click(tool('Text'))
     click(surface(), [40, 90])
     const text = $<SVGTextElement>('[data-id] text')!
     expect(text.textContent).toBe('Text')
     expect(text.getAttribute('x')).toBe('40')
-    // The side panel offers the content of a selected text object.
+    // It opens for typing where it sits, so the placeholder can be replaced
+    // without first finding the field in the side panel.
+    const editor = $<HTMLInputElement>('input[aria-label="Edit text"]')!
+    expect(editor.value).toBe('Text')
+    // And the object itself is not drawn twice while the editor stands in.
+    expect($('[data-id]')!.getAttribute('visibility')).toBe('hidden')
+    fireEvent.change(editor, { target: { value: 'Beans' } })
+    fireEvent.keyDown(editor, { key: 'Enter' })
+    expect($('[data-id] text')!.textContent).toBe('Beans')
+    expect($('input[aria-label="Edit text"]')).toBeNull()
+    expect($('[data-id]')!.getAttribute('visibility')).toBeNull()
+  })
+
+  it('offers the content of a selected text object in the side panel too', () => {
+    mount()
+    fireEvent.click(tool('Text'))
+    click(surface(), [40, 90])
+    fireEvent.keyDown($('input[aria-label="Edit text"]')!, { key: 'Escape' })
     const field = $<HTMLInputElement>('.draw-side input[aria-label="Text content"]')!
     fireEvent.change(field, { target: { value: 'Beans' } })
     expect($('[data-id] text')!.textContent).toBe('Beans')
+  })
+})
+
+describe('Draw: the line tool', () => {
+  /** The shape's own path; `Hitbox` renders a second one in the same group. */
+  const line = () => $$<SVGPathElement>('[data-id] > path')[0]
+
+  it('draws a single straight line between the two points', () => {
+    mount()
+    fireEvent.click(tool('Line'))
+    drag([10, 20], [110, 70])
+    expect(line().getAttribute('d')).toBe('M 10 20 L 110 70')
+    expect($$('[data-id]')).toHaveLength(1)
+    // One drawn shape hands the pointer back, as the other shape tools do.
+    expect($('.draw')!.getAttribute('data-tool')).toBe('pick')
+  })
+
+  it('keeps a horizontal line, which has no height at all', () => {
+    mount()
+    fireEvent.click(tool('Line'))
+    drag([10, 40], [120, 40])
+    // The rect tool's `w < 2 || h < 2` guard would throw this away, and a
+    // vertical one with it -- the two lines people draw most.
+    expect(line().getAttribute('d')).toBe('M 10 40 L 120 40')
+  })
+
+  it('keeps a vertical line, which has no width at all', () => {
+    mount()
+    fireEvent.click(tool('Line'))
+    drag([50, 10], [50, 130])
+    expect(line().getAttribute('d')).toBe('M 50 10 L 50 130')
+  })
+
+  it('ignores a stray click that draws nothing', () => {
+    mount()
+    fireEvent.click(tool('Line'))
+    drag([50, 50], [51, 51])
+    expect($$('[data-id]')).toHaveLength(0)
+  })
+
+  it('snaps both ends onto nearby points', () => {
+    mount()
+    fireEvent.click(tool('Line'))
+    drag([0, 0], [100, 0])
+    fireEvent.click(tool('Line'))
+    // Starts three units off one end and finishes two off the other.
+    drag([3, 2], [98, 2])
+    expect($$<SVGPathElement>('[data-id] > path').at(-1)!.getAttribute('d')).toBe('M 0 0 L 100 0')
+  })
+
+  it('is a stroke with no fill, and is grabbable along its length', () => {
+    mount()
+    fireEvent.click(tool('Line'))
+    drag([10, 20], [110, 70])
+    expect(line().getAttribute('fill')).toBe('none')
+    // An unfilled path encloses nothing, so a filled hit copy catches nothing
+    // and the only target would be a one-unit stroke.
+    const hit = $$<SVGPathElement>('[data-id] > path')[1]
+    expect(hit.getAttribute('stroke')).toBe('transparent')
+    expect(Number(hit.getAttribute('stroke-width'))).toBeGreaterThanOrEqual(8)
+  })
+
+  it('gives the node tool something to bend', () => {
+    mount()
+    fireEvent.click(tool('Line'))
+    drag([0, 0], [100, 0])
+    fireEvent.click(tool('Node'))
+    click($$<SVGPathElement>('[data-id] > path')[1], [50, 0])
+    expect($$('[data-node$=":p"]')).toHaveLength(2)
+  })
+})
+
+describe('Draw: text', () => {
+  const editor = () => $<HTMLInputElement>('input[aria-label="Edit text"]')
+  const label = () => $('[data-id] text')!.textContent
+  /** A placed line of text, with the editor it opens already dismissed. */
+  const withText = (at: [number, number] = [40, 90]) => {
+    const r = mount()
+    fireEvent.click(tool('Text'))
+    click(surface(), at)
+    fireEvent.keyDown(editor()!, { key: 'Escape' })
+    return r
+  }
+
+  it('edits a line of text in place when it is double-clicked', () => {
+    withText()
+    expect(editor()).toBeNull()
+    fireEvent.doubleClick($('[data-id] text')!)
+    expect(editor()!.value).toBe('Text')
+    fireEvent.change(editor()!, { target: { value: 'Beans' } })
+    fireEvent.keyDown(editor()!, { key: 'Enter' })
+    expect(label()).toBe('Beans')
+  })
+
+  it('abandons an edit on Escape, keeping what was there', () => {
+    withText()
+    fireEvent.doubleClick($('[data-id] text')!)
+    fireEvent.change(editor()!, { target: { value: 'scrapped' } })
+    fireEvent.keyDown(editor()!, { key: 'Escape' })
+    expect(label()).toBe('Text')
+    expect(editor()).toBeNull()
+  })
+
+  it('edits the text under the text tool rather than stacking another on it', () => {
+    withText()
+    fireEvent.click(tool('Text'))
+    click($('[data-id] text')!, [45, 90])
+    // One object, opened for typing. It used to drop a second "Text" on top,
+    // which is what "I cannot edit the text" looks like from the outside.
+    expect($$('[data-id]')).toHaveLength(1)
+    expect(editor()!.value).toBe('Text')
+  })
+
+  it('removes a line of text that is emptied, rather than leaving a ghost', () => {
+    withText()
+    fireEvent.doubleClick($('[data-id] text')!)
+    fireEvent.change(editor()!, { target: { value: '' } })
+    fireEvent.keyDown(editor()!, { key: 'Enter' })
+    // Zero width, unclickable and invisible -- better gone than haunting.
+    expect($$('[data-id]')).toHaveLength(0)
+  })
+
+  it('counts a whole edit as one undo step, not one per keystroke', () => {
+    withText()
+    const field = $<HTMLInputElement>('.draw-side input[aria-label="Text content"]')!
+    for (const v of ['Te', 'Tex', 'Text!', 'Text!!']) {
+      fireEvent.change(field, { target: { value: v } })
+    }
+    expect(label()).toBe('Text!!')
+    fireEvent.click(menuItem('Edit', 'Undo'))
+    // One press goes back past the whole run, not one letter of it.
+    expect(label()).toBe('Text')
+  })
+
+  it('sets the size of the selected text and remembers it for the next one', () => {
+    withText()
+    const size = $<HTMLInputElement>('.draw-side input[aria-label="Font size"]')!
+    expect(size.value).toBe('24')
+    fireEvent.change(size, { target: { value: '48' } })
+    expect($('[data-id] text')!.getAttribute('font-size')).toBe('48')
+
+    fireEvent.click(tool('Text'))
+    click(surface(), [40, 300])
+    fireEvent.keyDown(editor()!, { key: 'Escape' })
+    expect($$('[data-id] text').at(-1)!.getAttribute('font-size')).toBe('48')
+  })
+
+  it('offers the size and the face before anything is placed', () => {
+    mount()
+    fireEvent.click(tool('Text'))
+    expect($('.draw-side input[aria-label="Font size"]')).toBeTruthy()
+    expect($('.draw-side [role="group"][aria-label="Font"]')).toBeTruthy()
+    // Nothing is selected, so there is no content to offer yet.
+    expect($('.draw-side input[aria-label="Text content"]')).toBeNull()
+  })
+
+  it('switches the face from the panel', () => {
+    withText()
+    const serif = $$<HTMLButtonElement>('[role="group"][aria-label="Font"] button')
+      .find((b) => b.textContent === 'Serif')!
+    fireEvent.click(serif)
+    expect($('[data-id] text')!.getAttribute('font-family')).toContain('Georgia')
+    expect(serif.getAttribute('aria-pressed')).toBe('true')
+  })
+
+  it('saves a real font stack, not a CSS variable', async () => {
+    const panelButton = (l: string) =>
+      $$<HTMLButtonElement>('.savepanel .b-button').find((b) => b.textContent === l)!
+    withText()
+    fireEvent.click(menuItem('File', 'Save'))
+    await waitFor(() => expect($('.savepanel')).toBeTruthy())
+    fireEvent.click(panelButton('Save'))
+    await waitFor(() => expect(useFs.getState().read('/boot/home/drawings/Untitled.svg')).toBeTruthy())
+    const written = useFs.getState().read('/boot/home/drawings/Untitled.svg')!
+    // `var(--font-plain)` resolves to nothing outside this page, so a drawing
+    // saved with it opened everywhere else in the reader's default face.
+    expect(written).not.toContain('var(--')
+    expect(written).toContain('DejaVu Sans')
   })
 })
 
@@ -411,6 +700,76 @@ describe('Draw: curves and nodes', () => {
     expect($('[data-id] path')).toBeTruthy()
   })
 
+  it('outlines a rect under the node tool and says how to get nodes out of it', () => {
+    mount()
+    fireEvent.click(tool('Rectangle'))
+    drag([10, 10], [110, 60])
+    fireEvent.click(tool('Node'))
+    click($('[data-id] rect')!, [50, 30])
+    // Not a dead tool: the selection is still drawn, just without handles.
+    expect($('.draw-marchers')).toBeTruthy()
+    expect($$('[data-handle]')).toHaveLength(0)
+    expect($('.draw-status')!.textContent).toContain('convert it to curves')
+  })
+
+  it('converts a rect to curves when the node tool double-clicks it', () => {
+    mount()
+    fireEvent.click(tool('Rectangle'))
+    drag([10, 10], [110, 60])
+    fireEvent.click(tool('Node'))
+    click($('[data-id] rect')!, [50, 30])
+    fireEvent.doubleClick($('[data-id] rect')!)
+    expect($$('[data-node$=":p"]')).toHaveLength(4)
+    expect($('[data-id] path')).toBeTruthy()
+  })
+
+  /** A two-node line under the node tool, selected at its LAST node. */
+  const lineAtLastNode = () => {
+    const r = mount()
+    fireEvent.click(tool('Line'))
+    drag([0, 0], [100, 0])
+    fireEvent.click(tool('Node'))
+    click($$<SVGPathElement>('[data-id] > path')[1], [50, 0])
+    click($('[data-node="1:p"]')!, [100, 0])
+    expect($('.draw-status')!.textContent).toContain('node 2 of 2')
+    return r
+  }
+
+  it('offers no Insert on the last node of an open path, and no Delete at the minimum', () => {
+    lineAtLastNode()
+    const items = openMenu('Object')
+    const item = (l: string) => items.find((n) => n.textContent?.startsWith(l))!
+    // There is no segment after the last node of an open path to split, and
+    // two nodes is the fewest a line can be drawn with.
+    expect(item('Insert node').disabled).toBe(true)
+    expect(item('Delete node').disabled).toBe(true)
+    // The one that can still act is not dragged down with them.
+    expect(item('Smooth node').disabled).toBe(false)
+  })
+
+  it('records no undo step when the Delete key is refused at the minimum', () => {
+    lineAtLastNode()
+    // The key has no disabled state to stop it, so it is the live route into
+    // `editNode` at a boundary.
+    fireEvent.keyDown(window, { key: 'Delete' })
+    expect($('[data-id] path')!.getAttribute('d')).toBe('M 0 0 L 100 0')
+    // `replaceShape` builds a new document around even an identical shape, and
+    // a new object is what `commit` reads as an edit -- so the refusal used to
+    // cost an undo step, and one Undo no longer reached the line itself.
+    fireEvent.click(menuItem('Edit', 'Undo'))
+    expect($$('[data-id]')).toHaveLength(0)
+  })
+
+  it('keeps the chosen node when an edit is refused', () => {
+    lineAtLastNode()
+    fireEvent.keyDown(window, { key: 'Delete' })
+    // `after` used to clear the selection for an edit that never happened.
+    expect($('.draw-status')!.textContent).toContain('node 2 of 2')
+    expect($('[data-node="1:p"]')!.getAttribute('data-active')).toBe('true')
+    // And the whole line is certainly not deleted instead.
+    expect($$('[data-id]')).toHaveLength(1)
+  })
+
   it('drags a node and moves only that corner', () => {
     mount()
     fireEvent.click(tool('Rectangle'))
@@ -422,13 +781,133 @@ describe('Draw: curves and nodes', () => {
     expect($('[data-id] path')!.getAttribute('d')!.startsWith('M 30 0')).toBe(true)
   })
 
+  it('keeps the selection when a segment of the edited curve is pressed', () => {
+    mount()
+    fireEvent.click(tool('Rectangle'))
+    drag([10, 10], [110, 60])
+    fireEvent.click(menuItem('Object', 'Convert to curves'))
+    expect($$('[data-node$=":p"]')).toHaveLength(4)
+    // The segment stripes are seven units wide and lie over the curve. A press
+    // on one used to fall through to "clicked the background" and drop the
+    // selection, so clicking your own curve made every node vanish.
+    click($('[data-seg="0"]')!, [50, 10])
+    expect($$('[data-node$=":p"]')).toHaveLength(4)
+  })
+
   it('inserts a node when a segment is double-clicked', () => {
     mount()
     fireEvent.click(tool('Rectangle'))
     drag([10, 10], [110, 60])
     fireEvent.click(menuItem('Object', 'Convert to curves'))
+    // The real sequence: a double-click presses first, and that press has to
+    // leave the path selected or there is nothing left to split. jsdom's
+    // `doubleClick` fires no `pointerdown` of its own, so a test that only
+    // called it passed while the browser did nothing at all.
+    click($('[data-seg="0"]')!, [50, 10])
     fireEvent.doubleClick($('[data-seg="0"]')!)
     expect($$('[data-node$=":p"]')).toHaveLength(5)
+  })
+
+  it('keeps the selection when the marching-ants outline is pressed', () => {
+    mount()
+    fireEvent.click(tool('Rectangle'))
+    drag([10, 10], [110, 60])
+    click($('.draw-marchers')!, [10, 30])
+    expect($$('[data-handle]')).toHaveLength(9)
+  })
+
+  /** A three-node open path under the node tool, ready to edit. */
+  const withCurve = () => {
+    const r = mount()
+    fireEvent.click(tool('Polyline'))
+    click(surface(), [0, 0])
+    click(surface(), [40, 0])
+    click(surface(), [40, 30])
+    fireEvent.doubleClick(surface())
+    fireEvent.click(tool('Node'))
+    click($('[data-id] path')!, [20, 0])
+    return r
+  }
+
+  it('acts on the node that was clicked, not on a hardcoded one', () => {
+    withCurve()
+    click($('[data-node="1:p"]')!, [40, 0])
+    fireEvent.click(menuItem('Object', 'Delete node'))
+    // The middle node goes. This used to delete `nodes.length - 1` whatever
+    // you had clicked, so it always took the last one.
+    expect($('[data-id] path')!.getAttribute('d')).toBe('M 0 0 L 40 30')
+  })
+
+  // One `openMenu` per test: opening the same menubar title again toggles the
+  // panel shut, and the second read then finds no items at all.
+  it('leaves the node menu disabled until a node is chosen', () => {
+    withCurve()
+    const items = openMenu('Object')
+    const item = (l: string) => items.find((n) => n.textContent?.startsWith(l))!
+    expect(item('Insert node').disabled).toBe(true)
+    expect(item('Delete node').disabled).toBe(true)
+    expect(item('Smooth node').disabled).toBe(true)
+  })
+
+  it('enables the node menu once a node is chosen', () => {
+    withCurve()
+    click($('[data-node="1:p"]')!, [40, 0])
+    expect(menuItem('Object', 'Smooth node').disabled).toBe(false)
+  })
+
+  it('smooths the chosen node into an actual curve', () => {
+    withCurve()
+    expect($('[data-id] path')!.getAttribute('d')).not.toContain('C')
+    click($('[data-node="1:p"]')!, [40, 0])
+    fireEvent.click(menuItem('Object', 'Smooth node'))
+    // The whole point of the tool: a straight polygon becomes a curve, and
+    // there are grips to drag. Setting the flag alone changed neither.
+    expect($('[data-id] path')!.getAttribute('d')).toContain('C')
+    expect($$('[data-node="1:in"], [data-node="1:out"]')).toHaveLength(2)
+    // The menu now offers the way back.
+    expect(menuItem('Object', 'Cusp node')).toBeTruthy()
+  })
+
+  it('toggles a node between smooth and cusp on a double-click', () => {
+    withCurve()
+    click($('[data-node="1:p"]')!, [40, 0])
+    expect($('[data-node="1:p"]')!.getAttribute('data-smooth')).toBe('false')
+    fireEvent.doubleClick($('[data-node="1:p"]')!)
+    expect($('[data-node="1:p"]')!.getAttribute('data-smooth')).toBe('true')
+    expect($('[data-id] path')!.getAttribute('d')).toContain('C')
+    fireEvent.doubleClick($('[data-node="1:p"]')!)
+    // Back to a cusp -- and the handles stay, because that is what a cusp is:
+    // two handles that no longer mirror one another. The curve stays a curve.
+    expect($('[data-node="1:p"]')!.getAttribute('data-smooth')).toBe('false')
+    expect($$('[data-node="1:in"], [data-node="1:out"]')).toHaveLength(2)
+  })
+
+  it('marks the chosen node and names it in the status line', () => {
+    withCurve()
+    click($('[data-node="1:p"]')!, [40, 0])
+    expect($('[data-node="1:p"]')!.getAttribute('data-active')).toBe('true')
+    expect($('[data-node="0:p"]')!.getAttribute('data-active')).toBe('false')
+    expect($('.draw-status')!.textContent).toContain('node 2 of 3')
+  })
+
+  it('deletes the chosen node on Delete, and not the whole shape', () => {
+    withCurve()
+    click($('[data-node="1:p"]')!, [40, 0])
+    fireEvent.keyDown(window, { key: 'Delete' })
+    expect($$('[data-id]')).toHaveLength(1)
+    expect($('[data-id] path')!.getAttribute('d')).toBe('M 0 0 L 40 30')
+  })
+
+  it('does not nudge a node when it is merely clicked', () => {
+    withCurve()
+    const before = $('[data-id] path')!.getAttribute('d')
+    // A press two units off the node itself, with no movement.
+    click($('[data-node="1:p"]')!, [42, 2])
+    expect($('[data-id] path')!.getAttribute('d')).toBe(before)
+    // And no undo step was pushed for standing still: one undo goes back past
+    // drawing the path itself, rather than past a nudge nobody asked for.
+    fireEvent.click(menuItem('Edit', 'Undo'))
+    expect($$('[data-id]')).toHaveLength(0)
   })
 
   it('will not offer to convert text', () => {

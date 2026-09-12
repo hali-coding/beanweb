@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import {
+  anchorPoints,
   bounds,
   centreOf,
+  corner,
   corners,
   deleteNode,
   duplicateShape,
@@ -11,6 +13,7 @@ import {
   KAPPA,
   lower,
   moveHandle,
+  nearestAnchor,
   normalizeColor,
   parsePathData,
   parseSVG,
@@ -116,6 +119,59 @@ describe('geometry', () => {
   })
 })
 
+describe('snapping', () => {
+  it('offers a path its node anchors and a box its corners and centre', () => {
+    expect(anchorPoints([poly()])).toEqual([
+      { x: 0, y: 0 },
+      { x: 40, y: 0 },
+      { x: 40, y: 30 },
+    ])
+    expect(anchorPoints([rect()])).toEqual([
+      { x: 10, y: 20 },
+      { x: 110, y: 20 },
+      { x: 110, y: 70 },
+      { x: 10, y: 70 },
+      { x: 60, y: 45 },
+    ])
+  })
+
+  it('has nothing to offer for a foreign shape', () => {
+    expect(anchorPoints([{ kind: 'foreign', id: 'f1', markup: '<image/>' }])).toEqual([])
+  })
+
+  it('offers an anchor where the shape is drawn, not where it is stored', () => {
+    // A quarter turn about (20, 15) takes (0, 0) to (35, -5).
+    const [first] = anchorPoints([poly({ rotation: 90 })])
+    expect(first.x).toBeCloseTo(35)
+    expect(first.y).toBeCloseTo(-5)
+  })
+
+  it('puts node anchors ahead of box corners, so a node wins a tie', () => {
+    // The rect's top-left corner and the path's first node are both (10, 20).
+    const pts = anchorPoints([rect(), poly({ nodes: [corner(10, 20)] })])
+    expect(pts[0]).toEqual({ x: 10, y: 20 })
+    expect(nearestAnchor(pts, { x: 10, y: 20 }, 9)).toEqual({ x: 10, y: 20 })
+  })
+
+  it('takes the nearest candidate inside the radius and none outside it', () => {
+    const pts = [
+      { x: 0, y: 0 },
+      { x: 10, y: 0 },
+    ]
+    expect(nearestAnchor(pts, { x: 7, y: 0 }, 5)).toEqual({ x: 10, y: 0 })
+    expect(nearestAnchor(pts, { x: 5, y: 0 }, 4)).toBeNull()
+    // The radius is exclusive, so a snap never fires from exactly its edge.
+    expect(nearestAnchor(pts, { x: 5, y: 0 }, 5)).toBeNull()
+  })
+
+  it('hands back a copy, so a snapped point cannot alias a shape', () => {
+    const pts = [{ x: 3, y: 4 }]
+    const hit = nearestAnchor(pts, { x: 3, y: 4 }, 2)!
+    hit.x = 99
+    expect(pts[0].x).toBe(3)
+  })
+})
+
 describe('convert to curves', () => {
   it('turns a plain rect into four corners covering the same box', () => {
     const p = toPath(rect())!
@@ -212,6 +268,46 @@ describe('node editing', () => {
     expect(moved.nodes[0].out).toEqual({ x: 0, y: 30 })
     expect(moved.nodes[0].in.x).toBeCloseTo(0)
     expect(moved.nodes[0].in.y).toBeCloseTo(-10)
+  })
+
+  it('gives a corner node real handles, aimed from neighbour to neighbour', () => {
+    // A right angle: (0,0) -> (40,0) -> (40,30). Smoothing the elbow should
+    // aim its tangent along (0,0) -> (40,30), which is the direction (0.8, 0.6).
+    const n = setNodeSmooth(poly({ closed: false }), 1, true).nodes[1]
+    expect(n.smooth).toBe(true)
+    // Handles exist at all -- the whole bug was that they did not.
+    expect(Math.hypot(n.out.x, n.out.y)).toBeGreaterThan(0)
+    expect(n.out.x / Math.hypot(n.out.x, n.out.y)).toBeCloseTo(0.8)
+    expect(n.out.y / Math.hypot(n.out.x, n.out.y)).toBeCloseTo(0.6)
+    // Opposite, and a third of the way to each neighbour.
+    expect(n.in.x).toBeCloseTo(-n.out.x * (40 / 3) / (30 / 3))
+    expect(Math.hypot(n.in.x, n.in.y)).toBeCloseTo(40 / 3)
+    expect(Math.hypot(n.out.x, n.out.y)).toBeCloseTo(30 / 3)
+  })
+
+  it('turns a straight polygon into a curve, which is what the tool is for', () => {
+    const before = pathData(poly({ closed: false }))
+    expect(before).not.toContain('C')
+    expect(pathData(setNodeSmooth(poly({ closed: false }), 1, true))).toContain('C')
+  })
+
+  it('gives an open path\'s endpoint only the handle it actually uses', () => {
+    const line = poly({ closed: false })
+    const first = setNodeSmooth(line, 0, true).nodes[0]
+    expect(first.in).toEqual({ x: 0, y: 0 })
+    expect(first.out.x).toBeCloseTo(40 / 3)
+    const last = setNodeSmooth(line, 2, true).nodes[2]
+    expect(last.out).toEqual({ x: 0, y: 0 })
+    expect(Math.hypot(last.in.x, last.in.y)).toBeCloseTo(30 / 3)
+  })
+
+  it('returns to a cusp, and hands back the same shape when nothing changes', () => {
+    const smoothed = setNodeSmooth(poly({ closed: false }), 1, true)
+    const cusped = setNodeSmooth(smoothed, 1, false)
+    expect(cusped.nodes[1].smooth).toBe(false)
+    // Identity, so `commit` records no undo step for a no-op.
+    expect(setNodeSmooth(cusped, 1, false)).toBe(cusped)
+    expect(setNodeSmooth(cusped, 9, true)).toBe(cusped)
   })
 
   it('aligns the handles when a node is made smooth', () => {

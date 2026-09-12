@@ -12,7 +12,7 @@ npm run build      # tsc -b && vite build  -> dist/
 npm run preview    # serve the production build
 npm run build:pkgs # pack pkgs/* into installable .pkg files
 npm run typecheck  # types only
-npm test           # vitest run  (622 tests)
+npm test           # vitest run  (670 tests)
 npm run test:watch # vitest, watch mode
 ```
 
@@ -360,6 +360,144 @@ and `svg.ts` the two directions of the file format.
   save. The node tool therefore cannot touch one, and the answer is
   CorelDRAW's own: *Object → Convert to curves* (`toPath`), which is `Alt+Q`
   and is where an editable path comes from.
+- **The toolbox glyphs are drawn, not typed.** They were single characters
+  once, and `◇` for the node tool sat between `▭` and `◯` and read as *draw a
+  diamond*: it got picked, dragged, and did nothing, because it edits the nodes
+  of a curve that already exists. No character in the font says "a curve with
+  nodes on it", so `ToolGlyph` draws all seven on a 16-unit grid in
+  `currentColor` — original artwork, like `lib/icons.tsx`, and one copy for
+  both themes. The tool is labelled **Node** rather than Shape for the same
+  reason: "Shape", listed above Rectangle and Ellipse, reads as a third one.
+- **The overlay belongs to the selection, and a press on it is a press on
+  that shape.** It paints *over* the artwork, and the node tool's `.draw-seg`
+  stripes are seven units wide and lie along the curve, carrying no `data-id`
+  — so a press on one used to fall through to "clicked the background" and
+  drop the selection. Clicking your own curve made every node vanish, and
+  because a double-click begins with that same press, *inserting* a node was
+  impossible: `onDoubleClick` found nothing selected left to split. The suite
+  was green throughout, because jsdom's `fireEvent.doubleClick` fires no
+  `pointerdown` of its own and the test never pressed first. Any test about a
+  double-click here has to press, then double-click. Drive the browser.
+- **A tool that cannot act still has to answer.** The node tool on a rect, an
+  ellipse or a line of text drew *nothing whatever* — the selection handles are
+  hidden under it and there are no nodes to put in their place — so the tool
+  looked broken rather than inapplicable. It now leaves the marching-ants
+  outline up (`SelectionOutline`, shared with `SelectionHandles` so the two
+  cannot drift), the status line names the way out, and a double-click takes
+  it: `toPath`, which is what a double-click with CorelDRAW's shape tool does
+  too.
+- **The node tool needs a *selected node*, and had none.** Clicking a node only
+  ever started a drag, so the Object menu had nothing to act on and guessed:
+  *Delete node* took `nodes.length - 1` and *Smooth node* took `0`, whatever
+  you had clicked. `selectedNode` is now state beside `selected`, cleared
+  whenever the shape or the tool changes, set by the `pointerdown` that starts
+  a node drag, and read by the menu, the Delete key and the status line. The
+  chosen node is drawn larger and ringed in `--mark` — the fill already means
+  smooth-or-cusp and could not carry a second meaning.
+- **`setNodeSmooth` on a corner has to invent the handles.** A corner node has
+  none — every node of a polygon, a converted rectangle, anything the polyline
+  drew — and the old version set the flag and stopped: the path did not move,
+  no grip appeared, and there was no way anywhere in the app to turn a straight
+  line into a curve, which is the one thing the node tool is for. It now takes
+  its tangent from the line between its two neighbours, a third of the way to
+  each. An endpoint of an open path has one neighbour and gets only the handle
+  it uses — as an explicit zero, because `-ux * 0` is `-0` and would be written
+  into the file as `-0`.
+- **An op that refuses hands back the same shape, and the caller has to look.**
+  `insertNode` on the last node of an open path has no segment to split and
+  `deleteNode` at the minimum node count has nothing it may remove, so both
+  return the *very same* `PathShape`. `replaceShape` still builds a new
+  document around it, and a new object is what `commit` reads as an edit -- so
+  a refusal cost an undo step that changed nothing, and `editNode`'s `after`
+  then moved the selection to a node the op never made. `editNode` compares the
+  result by identity and returns early, and the menu items are disabled by
+  *asking the op* (`nodeOpApplies`) rather than by re-stating its boundary
+  here, which is how the two would come to disagree. The Delete key has no
+  disabled state to stop it, so it is the live route into a boundary and the
+  one the tests drive.
+- **Making a node a cusp keeps its handles.** That is what a cusp *is*: two
+  handles that no longer mirror each other. A test asserting the curve goes
+  straight again is asserting the wrong thing.
+- **A click on a node must not move it.** The `node` gesture committed
+  `moveNode` to wherever the pointer went down, so merely choosing a node
+  shifted it to the pixel clicked and pushed an undo step for it. It now
+  carries `start` and refuses a zero-distance drag, which `move` has always
+  done.
+- **Text is typed on the page, not only in the panel.** Editing through the
+  side panel's field was the whole of it for a long time, and the two gestures
+  a person reaches for did nothing useful: double-clicking the words was
+  ignored, and picking the text tool and clicking them dropped a *second*
+  "Text" on top -- which is what "I cannot edit the text" looks like from the
+  outside. Both now open an editor where the words sit, and placing new text
+  opens one over the placeholder so it can be typed over. The panel's field
+  stays; this is the way that does not have to be found first.
+- **The editor is an `<input>` in a `<foreignObject>`.** Its box and its font
+  size are in *document* units, so the viewBox does the zoom arithmetic and
+  there is no screen-space maths to get wrong -- `toDocPoint`'s reasoning. The
+  box is measured from the *draft*, or the field stops growing as you type, and
+  the shape underneath is `visibility: hidden` so the line is not drawn twice.
+  Creating one needs `e.preventDefault()` on the `pointerdown`: without it the
+  browser's own mousedown action moves focus to the body *after* the handler
+  has mounted and focused the editor, and the object opens for typing and is
+  blurred in the same breath. That is the Terminal's click-to-focus rule, and
+  jsdom does not implement the default blur, so only a browser shows it.
+- **An edit is held as a draft and committed once.** `commit` takes an optional
+  coalesce key, and consecutive edits carrying the same one replace the last
+  history entry rather than pushing another: typing a label is one change to
+  the person doing it, and it used to cost an undo step per keystroke, so
+  undoing a word meant pressing Alt+Z once per letter. `undo`, `redo` and
+  `adopt` clear the key, or a later edit merges into an entry it has nothing to
+  do with. Emptying a line of text deletes the object -- a text shape with no
+  text has no width, cannot be clicked and cannot be seen.
+- **The faces are real stacks, never `var(--font-plain)`.** `toSVG` writes the
+  family into the file verbatim, and a CSS variable there resolves to nothing
+  outside this page, so every drawing saved with one opened elsewhere in the
+  reader's default face. `FONTS` holds three stacks and the sans one is the
+  desktop's own, so nothing changed on screen. Size and face are remembered for
+  the next text placed, the bargain `corner` strikes for rectangles.
+- **A line is a two-node path, not a shape of its own.** The line tool reuses
+  the `draw` drag the rect and ellipse tools use, and commits an open path with
+  two corner nodes -- so `<line>` round-trips through the same emitter,
+  `parseSVG` already reads one back, and the node tool can bend it without
+  anything being converted first. Its length is tested with `Math.hypot`, never
+  the box: a horizontal line is zero units tall and a vertical one zero wide,
+  so the `w < 2 || h < 2` guard the box tools share would silently discard
+  exactly the two lines people draw most. Its ends snap, `snap` being a field
+  on the gesture rather than a reading of `tool`, because the gesture's
+  `pointermove` closure does not see the tool.
+- **An unfilled path is grabbed along its stroke, not inside it.** It encloses
+  no area -- a line encloses none at all -- so `Hitbox`'s filled copy catches
+  nothing and the only target was the stroke itself, one document unit wide by
+  default. It now lays a `HIT_WIDTH` transparent stroke over the same curve. A
+  line is born `fill: null` for both reasons: it has no interior to fill, and
+  that is what puts the hitbox under it.
+- **The polyline snaps, and that is where its endings live.** `anchorPoints`
+  offers every path's node anchors and every other shape's four corners and
+  centre, rotated to where they are *drawn*; `nearestAnchor` takes the nearest
+  within `SNAP_PX / zoom`, so the catch feels the same size at every
+  magnification, and anchors are listed first so a node beats a corner lying on
+  top of it. The points already clicked are offered ahead of the document's, so
+  the last click can land back on the first and **close** the shape — the only
+  discoverable way to get a closed polygon, with *Object → Close curve* three
+  menus away. The same same-point test fixed a bug nobody had noticed: a
+  double-click's own first press used to leave a duplicate node behind, and
+  jsdom's `doubleClick` fires no `pointerdown`, so the suite could not see it.
+  The snap ring is one `<circle>` the gesture moves — same rule as the rubber
+  band, React never re-renders during it.
+- **The polyline's rubber band outlives its own pointerup**, so its
+  `pointermove` listener is not a drag's and must not be unhooked like one: the
+  band follows the pointer *between* clicks, and removing it on the pointerup
+  after each press would leave the line rigid. It therefore needs all three
+  ways off the window — it drops itself as soon as the gesture is no longer a
+  `poly`, the unmount cleanup takes it through `gesture.current.detach` for the
+  case where no move ever comes, and starting a second line detaches the first.
+  Without that last one, two lines drawn without a pointer move between them
+  left both listeners attached, writing the same `cur`.
+- **The status line is derived, not stored, and a drawing tool owns it.** Until
+  the first click there is nothing about a selection worth showing, and the
+  polyline's several endings have to be written down somewhere. Pick and the
+  node tool have no `status` in `TOOLS` and leave the bar to the selection,
+  which is what they act on.
 - **Geometry is baked; only rotation is a transform.** Moving a rect changes
   `x`/`y`. Rotation stays a `rotation` field emitted as `rotate(deg cx cy)`,
   because baking a rotation into a rect would force it to become a path. The
