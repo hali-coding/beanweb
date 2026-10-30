@@ -152,6 +152,21 @@ export function AlertIcon({ kind, size = 32 }: { kind: 'info' | 'warn' | 'stop';
   )
 }
 
+/** Pulse: a load meter -- lit columns on a dark instrument face. */
+export function PulseIcon({ size = 32, className }: IconProps) {
+  return (
+    <svg {...box(size)} className={className}>
+      <rect x="3" y="4" width="26" height="24" rx="2" fill="#141414" stroke="#000" strokeWidth="1.5" />
+      <g stroke="rgba(0,0,0,.45)" strokeWidth="0.75">
+        <rect x="7" y="16" width="4" height="8" fill="#3ad42f" />
+        <rect x="14" y="12" width="4" height="12" fill="#3ad42f" />
+        <rect x="14" y="8" width="4" height="4" fill="#e8d420" />
+        <rect x="21" y="19" width="4" height="5" fill="#3ad42f" />
+      </g>
+    </svg>
+  )
+}
+
 export function TetrisIcon({ size = 32, className }: IconProps) {
   return (
     <svg {...box(size)} className={className}>
