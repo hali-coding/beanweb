@@ -176,7 +176,7 @@ export function Pulse({ windowId }: AppProps) {
   const refFrameRef = useRef(Number.POSITIVE_INFINITY)
   /* The sample period, read by the paint loop so its easing follows the rate
      without the loop having to be torn down and rebuilt when that changes. */
-  const periodRef = useRef(RATES[DEFAULT_RATE].period)
+  const periodRef = useRef<number>(RATES[DEFAULT_RATE].period)
 
   /** Whole percents, mirrored out of the ref -- the only thing React renders. */
   const [loads, setLoads] = useState<number[]>(() => new Array(cores).fill(0))
@@ -197,6 +197,7 @@ export function Pulse({ windowId }: AppProps) {
 
   useEffect(() => {
     const period = RATES[rate].period
+    periodRef.current = period
     let id = 0
     let last = 0
 
@@ -259,6 +260,14 @@ export function Pulse({ windowId }: AppProps) {
 
     let raf = 0
     let lastFrame = performance.now()
+    // A hidden tab runs no frames, so the first one back would span the whole
+    // time away: one "long" frame, and a mean that hides every real stutter in
+    // the window after it. Marked on both edges, so it holds whichever of
+    // visibilitychange and the next frame the browser runs first.
+    let resumed = false
+    const onVisibility = () => {
+      resumed = true
+    }
     let w = 0
     let h = 0
 
@@ -299,7 +308,8 @@ export function Pulse({ windowId }: AppProps) {
       const now = performance.now()
       const delta = now - lastFrame
       lastFrame = now
-      if (delta > 0) {
+      if (resumed) resumed = false
+      else if (delta > 0) {
         const f = framesRef.current
         f.n += 1
         f.total += delta
@@ -325,8 +335,10 @@ export function Pulse({ windowId }: AppProps) {
     if (ctx) fit()
 
     raf = requestAnimationFrame(paint)
+    document.addEventListener('visibilitychange', onVisibility)
     return () => {
       cancelAnimationFrame(raf)
+      document.removeEventListener('visibilitychange', onVisibility)
       observer?.disconnect()
     }
   }, [cores])
