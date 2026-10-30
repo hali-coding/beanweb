@@ -1,0 +1,73 @@
+/*
+ * Pulse.
+ *
+ * The well is deliberately not themed -- it is an instrument face with its own
+ * LED palette, like Tetris's well and the Bean Challenge board, and every
+ * colour inside it is drawn in `apps/Pulse.tsx` rather than declared here.
+ * Everything around it is ordinary R5 chrome and uses the panel tokens.
+ */
+
+.pulse {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  background: var(--panel);
+}
+
+/* The sunken well, the same four-line bevel .tetris-well and .bean-stage use. */
+.pulse-stage {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  margin: 6px;
+  padding: 3px;
+  background: #141414;
+  box-shadow:
+    inset var(--hairline) var(--hairline) 0 0 var(--panel-darken-3),
+    inset calc(-1 * var(--hairline)) calc(-1 * var(--hairline)) 0 0 var(--panel-lighten-max),
+    inset calc(2 * var(--hairline)) calc(2 * var(--hairline)) 0 0 var(--panel-darken-2),
+    inset calc(-2 * var(--hairline)) calc(-2 * var(--hairline)) 0 0 var(--panel-lighten-1);
+}
+
+/* Sized in pixels by the app: the canvas is measured against the stage's
+   content box, so it must not be stretched by CSS as well. */
+.pulse-canvas {
+  display: block;
+}
+
+/* One cell per core. Until the app has measured the well the cells share the
+   row evenly; once it has, each one is the pitch wide and sits under its own
+   column, which is the only way the two agree at every window width. */
+.pulse-readout {
+  flex: none;
+  display: flex;
+  margin: 0 6px;
+  font-size: var(--fs-small);
+  color: var(--panel-text-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+.pulse-cpu {
+  flex: 1 1 0;
+  min-width: 0;
+  text-align: center;
+  overflow: hidden;
+}
+
+.pulse-readout--fitted .pulse-cpu {
+  flex: 0 0 var(--pulse-pitch);
+}
+
+.pulse-status {
+  flex: none;
+  height: 17px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 7px;
+  font-size: var(--fs-small);
+  color: var(--panel-text-faint);
+  white-space: nowrap;
+  overflow: hidden;
+}

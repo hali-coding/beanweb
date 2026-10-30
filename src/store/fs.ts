@@ -207,7 +207,7 @@ function seed(): Record<string, FsNode> {
     file('/boot/home/documents/tips.txt', TIPS),
     file(
       '/boot/home/documents/todo.txt',
-      'Replicants\nWorkspaces (3x3)\nPulse\nDeskCalc\nNetPositive\n',
+      'Replicants\nWorkspaces (3x3)\nDeskCalc\nNetPositive\n',
     ),
     file(
       '/boot/system/version',
@@ -229,6 +229,7 @@ function seed(): Record<string, FsNode> {
     app('/boot/apps/BeanChallenge', 'beanchallenge'),
     app('/boot/apps/BASIC', 'basic'),
     app('/boot/apps/Claude', 'claude'),
+    app('/boot/apps/Pulse', 'pulse'),
     app('/boot/apps/Coffee Shop', 'coffeeshop'),
   ]
   return Object.fromEntries(nodes.map((n) => [n.path, n]))

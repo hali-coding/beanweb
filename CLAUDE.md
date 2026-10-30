@@ -12,7 +12,7 @@ npm run build      # tsc -b && vite build  -> dist/
 npm run preview    # serve the production build
 npm run build:pkgs # pack pkgs/* into installable .pkg files
 npm run typecheck  # types only
-npm test           # vitest run  (670 tests)
+npm test           # vitest run  (695 tests)
 npm run test:watch # vitest, watch mode
 ```
 
@@ -951,6 +951,79 @@ preflet had, with more than one box in it.
   second window would otherwise share the first one's radio group. The Clock
   box has a group of its own, or the two boxes' radios would be one set.
 
+## Pulse
+
+R5's smallest accessory: one window, one climbing bar per CPU. `lib/pulse.ts`
+is the model and `apps/Pulse.tsx` the view -- the same division as Shut Down
+and Bean Challenge, so the whole of the measurement tests under jsdom.
+
+- **The core count is real and the split between them is not**, and the app
+  says so itself under *Pulse → What Pulse measures…*. `coreCount()` is
+  `navigator.hardwareConcurrency` clamped to 16. Everything below that is a
+  seeded random walk around a baseline. Its five constants are tuned together
+  and want measuring rather than nudging: clamping at zero rectifies the noise,
+  so the resting mean lands well above `IDLE`, and the width of the walk is
+  what decides how far above. `tests/pulse.test.ts` holds the resting mean
+  under 10% and is the only thing watching them. Measuring per-core load for
+  real means spinning a Web Worker on every core and counting iterations
+  against a calibrated maximum -- an idle accessory that heats the machine in
+  order to report that the machine is hot. That is why it is simulated and why it should
+  stay simulated.
+- **The baseline is real, and it comes from two measurements, not one.**
+  `pressureOf` reads the sampler's own lateness, which catches the thread
+  blocked outright. `jitterPressure` reads what fraction of the window's frames
+  stuttered, which catches everything else. The model is fed whichever is
+  higher.
+- **Two wrong readings of "the machine is busy" came before that one, and a
+  browser is what found both.** Anything long-running here works in slices --
+  the BASIC interpreter, the Claude token stream -- so the sampling interval
+  still fires roughly on time *and* Chrome still presents 60 frames a second.
+  So **average frame time** does not move: measured, an idle desktop holds
+  16.6–16.8 ms a frame and the same desktop running a BASIC loop swings
+  between 12 and 24 with the mean unchanged, and Pulse did not budge. The
+  **spread** of a window does move, but over a second's worth of frames a
+  single stray long frame is near certain, and one outlier put an idle machine
+  at 15%. What survives both is a **count**: frames longer than `JANK_RATIO`
+  times the previous window's mean, as a fraction. Measured again: 0 of 60 at
+  rest, 10–12 of 60 with a BASIC loop running. The window now reads 6% idle and
+  climbs to around 40–50% with that loop.
+- **A hidden tab is not sampled.** Timers there are throttled to about 1 Hz and
+  a very late tick is indistinguishable from real load -- a blocked thread is
+  late by seconds too, so no threshold separates them. The sampler stops on
+  `visibilitychange` and drops its `last` timestamp, which is also what keeps
+  the tab's return from reading as one enormous stall.
+- **The rAF loop runs whether or not there is a canvas**, because it is half
+  the measurement and not only the drawing. It is also the one animation loop
+  here with no `version` gate: Bean Challenge and the BASIC screen redraw a
+  board that changes on a tick, while Pulse *eases* every bar toward the last
+  sample, so it has something new to draw on every frame.
+- **A sample a second, and the easing is what makes that look animated.** This
+  is an idle monitor, and a bar landing on a fresh figure four times a second
+  reads as noise rather than as load. Easing and peak decay are therefore time
+  constants in milliseconds, never per-frame fractions -- a per-frame constant
+  travels twice as fast on a 120 Hz display as on a 60 Hz one, and cannot
+  follow the rate either. `EASE_OF_PERIOD` ties a bar's travel to whichever
+  rate the menu chose, so it spends its whole sample arriving instead of
+  snapping in a fifth of it and then standing still, which is what a slower
+  rate looks like otherwise. `RATES` and `DEFAULT_RATE` are exported so
+  `tests/pulseapp.test.tsx` drives the real periods rather than restating them.
+- **`layoutBars` is read by the canvas and by the readout row both.** The
+  columns stop widening at a cap, so past a certain window width the group
+  centres itself -- and a readout laid out with plain `flex: 1 1 0` kept
+  spreading, leaving every number fanned away from its own column in a zoomed
+  window. `fit()` writes the pitch and the offset onto the row as inline
+  styles. jsdom has no layout, so nothing in the suite can catch a regression
+  here; check it in a browser, zoomed.
+- **The well is a screen, not chrome, and is deliberately not themed** -- the
+  rule Terminal, the BASIC screen, Tetris and Bean Challenge already follow.
+  The LED colours are in `apps/Pulse.tsx`, never in `pulse.css`: green below
+  70% of a column, yellow above it, each unlit segment a dim copy of its own
+  colour so the ladder reads as hardware rather than as an empty box.
+- The refresh rate is component state rather than a persisted setting. Adding
+  one to `store/settings.ts` would mean adding it to `tests/setup.ts`'s reset
+  literal as well, which is more than a preference nobody will miss across a
+  reload is worth. The three periods are half a second, one second and two.
+
 ## Responsive strategy
 
 One breakpoint at **768px**. Above it, a real floating window manager. Below it,
@@ -1110,7 +1183,7 @@ because the project has no backend to proxy through.
 
 ## Not built yet
 
-Replicants, the 3×3 Workspaces switcher, Pulse, DeskCalc, NetPositive, and media
+Replicants, the 3×3 Workspaces switcher, DeskCalc, NetPositive, and media
 apps. Window stacking/tiling (dragging one tab onto another) is not implemented;
 tab *sliding* along the top edge is, via Shift-drag.
 
