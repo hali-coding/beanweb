@@ -28,6 +28,7 @@ Check these for collisions before installing — the host is shared.
 | nginx | `sites-available/beanweb-test.conf`, logs `beanweb-test.*` |
 | Certificate | `--cert-name beanweb-test`, challenge webroot `/var/www/letsencrypt` |
 | nginx snippet | `snippets/cloudflare-realip.conf` (generic, safe for other sites to include too) |
+| nginx http map | `conf.d/cloudflare-geo.conf` → `$from_cloudflare` (generic) |
 
 ## One-time setup for test on sysweb1
 
@@ -50,16 +51,41 @@ Copy the package catalogue from the legacy box:
 rsync -av OLD_HOST:/var/www/pkgs/dist/*.pkg /var/www/beanweb-pkgs/
 ```
 
-### Cloudflare real-IP snippet
+### Cloudflare: real visitor IPs and the origin lock
 
-Without it every log line shows a Cloudflare edge address. Generated on the
-host because the ranges drift; re-run when Cloudflare publishes changes.
+Two files built from the same published ranges. Re-run both when Cloudflare
+changes them -- a range missing from the lock means visitors routed through it
+get 403.
 
 ```bash
-{ for r in $(curl -fsS https://www.cloudflare.com/ips-v4) $(curl -fsS https://www.cloudflare.com/ips-v6); do
-    echo "set_real_ip_from $r;"; done; echo 'real_ip_header CF-Connecting-IP;'; } \
+CF="$(curl -fsS https://www.cloudflare.com/ips-v4) $(curl -fsS https://www.cloudflare.com/ips-v6)"
+
+# 1. real visitor IPs in the logs -- included per site, never in http{}
+{ for r in $CF; do echo "set_real_ip_from $r;"; done
+  echo 'real_ip_header CF-Connecting-IP;'; } \
   | sudo tee /etc/nginx/snippets/cloudflare-realip.conf
+
+# 2. origin lock -- a variable only, so harmless to sites that never read it
+{ echo 'geo $realip_remote_addr $from_cloudflare {'
+  echo '    default 0;'; echo '    127.0.0.1/32 1;'; echo '    ::1/128 1;'
+  for r in $CF; do echo "    $r 1;"; done; echo '}'; } \
+  | sudo tee /etc/nginx/conf.d/cloudflare-geo.conf
+
+sudo nginx -t && sudo systemctl reload nginx
 ```
+
+The site file refuses anything else with `if ($from_cloudflare = 0) { return
+403; }` in both server blocks -- the nginx form of the Apache `Allow from`
+list. It cannot be `allow`/`deny`: the real-IP snippet rewrites `$remote_addr`
+to the visitor before the access phase, so allow-listing Cloudflare's ranges
+there would refuse every visitor. The geo map reads `$realip_remote_addr`, the
+address that actually connected. IPv6 edge ranges are in the lock too (the
+Apache list had only IPv4), and loopback is allowed so checks on the box work.
+
+Let's Encrypt still validates: its challenge reaches the origin through
+Cloudflare like any other request (`certbot renew --dry-run` passes with the
+lock in place). Docker's published ports bypass nginx entirely, which is why
+the Coffee Shop container binds `127.0.0.1`.
 
 ### Certificate (Let's Encrypt, HTTP-01 webroot)
 
