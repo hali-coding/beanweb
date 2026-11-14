@@ -18,7 +18,9 @@ npm run test:watch # vitest, watch mode
 
 CI runs typecheck -> test -> build on every PR (`.github/workflows/pr.yml`),
 and `.github/workflows/packages.yml` builds `pkgs/` into an installable
-**packages** artifact when the packages or the format change.
+**packages** artifact when the packages or the format change. On main it also
+publishes those exact files to the test server's Coffee Shop catalogue
+(`/var/www/beanweb-pkgs`), so nothing in the store was copied there by hand.
 
 Deploys are `deploy-*.yml`. Test (`beanweb-test.halicode.com`) runs on
 sysweb1 behind nginx, a host **shared with other sites**; prod is still on the
