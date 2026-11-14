@@ -62,12 +62,26 @@ maintainer's machine holds the sources and the install scripts):
 | On sysweb1 | What it does |
 |---|---|
 | `sites-available/catch-all` | the only `default_server`. Port 80 for **every** hostname: Let's Encrypt challenges, then 301 to https. Port 443 for unknown names: TLS handshake refused. Site files therefore have no port-80 block. The package's `default` site is disabled, its file left in place. |
-| `snippets/https.conf` | `listen 443 ssl` (v4 + v6), `http2 on`, challenges on 443 too |
-| `snippets/cloudflare.conf` | real visitor IPs (`snippets/cloudflare-realip.conf`) and the origin lock: 403 unless the connection came from Cloudflare's edge or loopback |
+| `snippets/https.conf` | `listen 443 ssl` (v4 + v6), `http2 on`, challenges on 443 too, `server_tokens off` |
+| `snippets/cloudflare.conf` | real visitor IPs (`snippets/cloudflare-realip.conf`) and the origin lock: anything not from Cloudflare's edge or loopback is closed with `444` -- no status, headers or page |
 | `snippets/static-spa.conf` / `static.conf` | SPA fallback + cache headers / plain static files |
 | `snippets/proxy.conf` | headers, HTTP/1.1 and WebSocket upgrade for a `proxy_pass` to a container |
 | `conf.d/sysweb1.conf` | `log_format vhost`, gzip types, TLS session cache, the `$connection_upgrade` map |
 | `conf.d/cloudflare-geo.conf` | the `$from_cloudflare` map. It keys on `$realip_remote_addr`: the real-IP rewrite runs before access checks, so a plain `allow`/`deny` of Cloudflare's ranges would refuse every visitor |
+
+**The origin is anonymous to direct visitors.** Hit by IP or by the
+machine's own name (`sysweb1.halicode.com`) instead of through Cloudflare:
+
+| Request | Response |
+|---|---|
+| `http://5.135.7.243/`, `http://sysweb1.halicode.com/` (any path) | connection closed, empty reply |
+| `https://5.135.7.243/`, `https://sysweb1.halicode.com/` | TLS handshake refused, no certificate shown |
+| `https://` with a real site's name forced to the IP | that site's certificate, then the connection is closed |
+
+The last row is the one thing a direct hit can learn, and only for a name it
+already knows -- a server cannot withhold its certificate from a client that
+asks for it by name. Through Cloudflare, the `Server` header is Cloudflare's
+and error pages say only `nginx` (`server_tokens off` per server block).
 
 `nginx.conf` and `sites-available/default` are the package's and are not
 edited. `/root/README-letsencrypt.txt` on the box explains certificates.
