@@ -20,6 +20,14 @@ CI runs typecheck -> test -> build on every PR (`.github/workflows/pr.yml`),
 and `.github/workflows/packages.yml` builds `pkgs/` into an installable
 **packages** artifact when the packages or the format change.
 
+Deploys are `deploy-*.yml`. Test (`beanweb-test.halicode.com`) runs on
+sysweb1 behind nginx, a host **shared with other sites**; prod is still on the
+legacy Apache box until it moves. The reusable workflows take `web_server`,
+`remote_user`, `bind_addr`, `compose_project` and `pkg_host_dir` so the two can
+differ, with defaults that keep the legacy box exactly as it was. Nothing in CI
+writes to `/etc`; `deploy/README.md` is the by-hand half. On sysweb1: reload
+nginx, never restart it, and prefix every path, port and name with `beanweb`.
+
 ## Testing
 
 `tests/` holds a Vitest + jsdom suite. `fs` and `desktop` are pure store tests;
@@ -626,7 +634,7 @@ protocol inside the jsdom suite.
   The sandbox stops a package *reading* BeanWeb's data; the CSP stops it
   *sending* what the `fs` permission lets it read. Isolation without it buys
   nothing against exfiltration. There is still no CSP on the top-level page —
-  that is Apache config outside this repo, and `index.html`'s pre-paint theme
+  that is nginx config in `deploy/nginx/`, and `index.html`'s pre-paint theme
   script would need a nonce first.
 - **Validate by `event.source`, never by origin.** An opaque origin posts
   `origin === "null"`, so every sandboxed frame looks alike and checking it
@@ -825,11 +833,11 @@ window because installing was already one function neither app owned
   restart. Read-only: there is no upload endpoint, and publishing a package is
   "put a `.pkg` file where it scans."
 - **`/api/coffeeshop` is the mount point on purpose** — a same-origin path a
-  reverse proxy drops straight behind, `coffeeshop/README.md` has the Apache
-  `ProxyPass` lines — so `lib/packages/coffeeshop.ts` fetches a relative URL
-  and moving from a locally-run backend to a production one behind Apache is
-  a deployment change, not a code change. In dev, `vite.config.ts`'s
-  `server.proxy` stands in for Apache, forwarding the same path to
+  reverse proxy drops straight behind, `deploy/nginx/` has the `location`
+  block — so `lib/packages/coffeeshop.ts` fetches a relative URL and moving
+  from a locally-run backend to a production one behind nginx is a
+  deployment change, not a code change. In dev, `vite.config.ts`'s
+  `server.proxy` stands in for nginx, forwarding the same path to
   `coffeeshop/`'s default port; `coffeeshop/README.md` has both sides of it.
 - Signing is still the one thing missing before a store is trustworthy, same
   as `docs/packages.md` has always said: `publisher` is exactly as

@@ -10,8 +10,8 @@ export default defineConfig({
   build: { target: 'es2022' },
   server: {
     // Coffee Shop (src/lib/packages/coffeeshop.ts) fetches this path as
-    // same-origin, the way it will once Apache reverse-proxies it in
-    // production (coffeeshop/README.md). In dev there is no Apache, so this
+    // same-origin, the way it is once nginx reverse-proxies it in
+    // production (deploy/nginx/). In dev there is no nginx, so this
     // proxy stands in for it: run the backend with `npm start` in
     // coffeeshop/ (defaults to :8080) and `npm run dev` here talks to it
     // without any source change.

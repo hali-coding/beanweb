@@ -24,9 +24,33 @@ on:
         required: true
         type: string
       port:
-        description: Host port to publish the coffeeshop container on
+        description: Host port to publish the coffeeshop container on (bound to 127.0.0.1)
         required: true
         type: string
+      pkg_host_dir:
+        description: >-
+          Host directory of .pkg files mounted read-only at /pkgs. Relative
+          paths resolve against deploy_path.
+        required: false
+        type: string
+        default: ../pkgs/dist
+      bind_addr:
+        description: >-
+          Host address the port is published on. `127.0.0.1` on a shared host,
+          where nginx is the only client; the default keeps the legacy prod
+          box exactly as it was.
+        required: false
+        type: string
+        default: 0.0.0.0
+      compose_project:
+        description: >-
+          Explicit compose project name, so --remove-orphans can only reach
+          this project's containers on a shared host. Empty keeps compose's
+          default (the deploy directory's name), which is what the legacy prod
+          box's running container was started under.
+        required: false
+        type: string
+        default: ''
 
 jobs:
   deploy:
@@ -100,10 +124,13 @@ jobs:
           REMOTE_USER: ${{ inputs.remote_user }}
           DEPLOY_PATH: ${{ inputs.deploy_path }}
           PORT: ${{ inputs.port }}
+          PKG_HOST_DIR: ${{ inputs.pkg_host_dir }}
+          BIND_ADDR: ${{ inputs.bind_addr }}
+          PROJECT: ${{ inputs.compose_project }}
         run: |
           echo -e "${MAGENTA}🔨 Rebuilding coffeeshop on ${SERVER_IP} (port ${PORT})...${RESET}"
           ssh -i ~/.ssh/deploy_key "${REMOTE_USER}@${SERVER_IP}" \
-            "cd '${DEPLOY_PATH}' && PORT='${PORT}' docker compose up -d --build --remove-orphans"
+            "cd '${DEPLOY_PATH}' && PORT='${PORT}' PKG_HOST_DIR='${PKG_HOST_DIR}' BIND_ADDR='${BIND_ADDR}' ${PROJECT:+COMPOSE_PROJECT_NAME='${PROJECT}'} docker compose up -d --build --remove-orphans"
           echo -e "${GREEN}✅ Container restarted!${RESET}"
 
       - name: 🩺 Verify container is healthy
@@ -111,11 +138,13 @@ jobs:
           SERVER_IP: ${{ secrets.SERVER_IP }}
           REMOTE_USER: ${{ inputs.remote_user }}
           DEPLOY_PATH: ${{ inputs.deploy_path }}
+          PROJECT: ${{ inputs.compose_project }}
         run: |
           echo -e "${CYAN}🩺 Waiting for the healthcheck...${RESET}"
-          ssh -i ~/.ssh/deploy_key "${REMOTE_USER}@${SERVER_IP}" bash -s -- "${DEPLOY_PATH}" <<'EOF'
+          ssh -i ~/.ssh/deploy_key "${REMOTE_USER}@${SERVER_IP}" bash -s -- "${DEPLOY_PATH}" "${PROJECT}" <<'EOF'
             set -e
             cd "$1"
+            if [ -n "${2:-}" ]; then export COMPOSE_PROJECT_NAME="$2"; fi
             cid="$(docker compose ps -q coffeeshop)"
             for _ in $(seq 1 15); do
               status="$(docker inspect --format='{{.State.Health.Status}}' "$cid" 2>/dev/null || echo starting)"

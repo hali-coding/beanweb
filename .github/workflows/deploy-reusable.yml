@@ -16,6 +16,14 @@ on:
         description: Remote directory to rsync dist/ into
         required: true
         type: string
+      web_server:
+        description: >-
+          Web server in front of deploy_path -- `apache` (the legacy prod box)
+          or `nginx` (sysweb1, shared with other sites). nginx is reloaded,
+          never restarted, so other sites on the host keep their connections.
+        required: false
+        type: string
+        default: apache
 
 jobs:
   deploy:
@@ -78,20 +86,32 @@ jobs:
             dist/ "${REMOTE_USER}@${SERVER_IP}:${DEPLOY_PATH}"
           echo -e "${GREEN}✅ Upload complete!${RESET}"
 
-      - name: 🧪 Test apache2 config
+      - name: 🧪 Test web server config
         env:
           SERVER_IP: ${{ secrets.SERVER_IP }}
           REMOTE_USER: ${{ inputs.remote_user }}
+          WEB_SERVER: ${{ inputs.web_server }}
         run: |
-          echo -e "${CYAN}🧪 Testing apache2 config...${RESET}"
-          ssh -i ~/.ssh/deploy_key "${REMOTE_USER}@${SERVER_IP}" "sudo apachectl -t"
+          case "$WEB_SERVER" in
+            apache) cmd='sudo apachectl -t' ;;
+            nginx)  cmd='sudo nginx -t' ;;
+            *) echo "unknown web_server: $WEB_SERVER" >&2; exit 1 ;;
+          esac
+          echo -e "${CYAN}🧪 Testing ${WEB_SERVER} config...${RESET}"
+          ssh -i ~/.ssh/deploy_key "${REMOTE_USER}@${SERVER_IP}" "$cmd"
           echo -e "${GREEN}✅ Config OK!${RESET}"
 
-      - name: 🔄 Restart apache2
+      - name: 🔄 Reload web server
         env:
           SERVER_IP: ${{ secrets.SERVER_IP }}
           REMOTE_USER: ${{ inputs.remote_user }}
+          WEB_SERVER: ${{ inputs.web_server }}
         run: |
-          echo -e "${YELLOW}🔄 Restarting apache2...${RESET}"
-          ssh -i ~/.ssh/deploy_key "${REMOTE_USER}@${SERVER_IP}" "sudo systemctl restart apache2"
+          case "$WEB_SERVER" in
+            apache) cmd='sudo systemctl restart apache2' ;;
+            nginx)  cmd='sudo systemctl reload nginx' ;;
+            *) echo "unknown web_server: $WEB_SERVER" >&2; exit 1 ;;
+          esac
+          echo -e "${YELLOW}🔄 ${cmd}...${RESET}"
+          ssh -i ~/.ssh/deploy_key "${REMOTE_USER}@${SERVER_IP}" "$cmd"
           echo -e "${GREEN}🎉 Deploy finished!${RESET}"
