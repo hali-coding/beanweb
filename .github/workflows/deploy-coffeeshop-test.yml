@@ -23,4 +23,8 @@ jobs:
       environment_name: test
       deploy_path: /var/www/beanweb-coffeeshop-test/
       port: '8081'
+      remote_user: ci
+      pkg_host_dir: /var/www/beanweb-pkgs
+      bind_addr: 127.0.0.1
+      compose_project: beanweb-coffeeshop-test
     secrets: inherit

@@ -28,8 +28,8 @@ PKG_DIR=/path/to/pkgs PORT=8080 npm start
 
 The frontend always fetches the relative path `/api/coffeeshop` -- see
 `lib/packages/coffeeshop.ts` -- so it never needs its own setting for where
-this server is. In production that path *is* this server, because Apache
-reverse-proxies it (below). In dev there is no Apache in front of Vite, so
+this server is. In production that path *is* this server, because the web
+server reverse-proxies it (below). In dev there is nothing in front of Vite, so
 `vite.config.ts`'s `server.proxy` stands in for it, forwarding
 `/api/coffeeshop` to `http://localhost:8080`:
 
@@ -61,20 +61,34 @@ docker build -t beanweb-coffeeshop .
 docker run -p 8080:8080 -v /path/to/pkgs:/pkgs:ro beanweb-coffeeshop
 ```
 
-## Reverse proxying behind Apache HTTPd
+## Reverse proxying
 
 The whole reason this lives under `/api/coffeeshop` rather than at its own
-root: it drops straight behind `mod_proxy` alongside the static BeanWeb build,
-one origin, no CORS to reason about in production.
+root: it drops straight behind a reverse proxy alongside the static BeanWeb
+build, one origin, no CORS to reason about in production. The container
+publishes on `127.0.0.1` by default, so the proxy is its only client.
 
-```apache
-ProxyPass        /api/coffeeshop http://coffeeshop:8080/api/coffeeshop
-ProxyPassReverse /api/coffeeshop http://coffeeshop:8080/api/coffeeshop
+nginx (sysweb1; the full site file is `deploy/nginx/beanweb-test.conf`):
+
+```nginx
+location /api/coffeeshop {
+    proxy_pass http://127.0.0.1:8081;
+    proxy_set_header Host $host;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+}
 ```
 
-(`mod_proxy` and `mod_proxy_http` need to be enabled.) The server also sends a
-permissive `Access-Control-Allow-Origin: *` on every response so it can be hit
-directly in development -- from `npm run dev`'s Vite server on a different
+Apache (the legacy prod box, until it moves; `mod_proxy` and `mod_proxy_http`
+enabled):
+
+```apache
+ProxyPass        /api/coffeeshop http://127.0.0.1:8080/api/coffeeshop
+ProxyPassReverse /api/coffeeshop http://127.0.0.1:8080/api/coffeeshop
+```
+
+The server also sends a permissive `Access-Control-Allow-Origin: *` on every
+response so it can be hit directly in development -- from `npm run dev`'s Vite server on a different
 port -- without the proxy in front of it. That header costs nothing here: the
 catalogue is public and read-only, there is no cookie or auth header to leak,
 and nothing is ever written.

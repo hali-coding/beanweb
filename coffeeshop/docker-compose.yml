@@ -5,10 +5,14 @@ services:
   coffeeshop:
     build: .
     ports:
-      - '${PORT:-8080}:8080'
+      # Loopback by default: the reverse proxy is the only client, and Docker's
+      # published ports bypass ufw. CI passes BIND_ADDR=0.0.0.0 for the legacy
+      # prod box, whose proxy setup predates this.
+      - '${BIND_ADDR:-127.0.0.1}:${PORT:-8080}:8080'
     environment:
       PKG_DIR: /pkgs
       SCAN_INTERVAL_MS: '100000'
     volumes:
-      - ../pkgs/dist:/pkgs:ro
+      # CI points this at the host's catalogue (/var/www/beanweb-pkgs on sysweb1).
+      - ${PKG_HOST_DIR:-../pkgs/dist}:/pkgs:ro
     restart: unless-stopped

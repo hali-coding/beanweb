@@ -18,4 +18,6 @@ jobs:
     with:
       environment_name: test
       deploy_path: /var/www/beanweb-test/
+      remote_user: ci
+      web_server: nginx
     secrets: inherit
