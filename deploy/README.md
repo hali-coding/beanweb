@@ -45,11 +45,13 @@ site on it is yours; if that changes, move BeanWeb to its own user with a
 sudoers line for `nginx -t` / `systemctl reload nginx` and a root-owned
 wrapper for compose, and change `remote_user` in the two test workflows.
 
-Copy the package catalogue from the legacy box:
-
-```bash
-rsync -av OLD_HOST:/var/www/pkgs/dist/*.pkg /var/www/beanweb-pkgs/
-```
+The package catalogue is filled by CI, not by hand: on main, the **Packages**
+workflow's `publish` job uploads the `.pkg` files it built and verified into
+`/var/www/beanweb-pkgs` and checks their SHA-256 on the server. It runs when
+`pkgs/` or the format changes; to fill an empty catalogue, run it by hand from
+main (`gh workflow run packages.yml --ref main`). It never deletes: a package
+dropped from `pkgs/` stays listed until someone removes the file on the
+server, which is also how a package *not* built from `pkgs/` can live there.
 
 ### Cloudflare: real visitor IPs and the origin lock
 

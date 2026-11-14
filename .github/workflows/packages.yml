@@ -5,6 +5,11 @@ name: Packages
 # downloadable artifact. `pr.yml` still runs the whole suite, which includes
 # `tests/pkgs.test.ts`; this workflow is what produces something to install.
 #
+# On main (push or a manual run from main) a second job publishes the same
+# .pkg files to the test server's Coffee Shop catalogue, so what the store
+# lists is always what this workflow built and verified -- never a file
+# copied there by hand. PRs only build.
+#
 # The two `paths` lists are duplicated rather than shared through a YAML
 # anchor: anchors are not documented as supported in workflow files, and a
 # parse failure here would take the whole workflow out.
@@ -106,3 +111,74 @@ jobs:
           path: pkgs/dist
           if-no-files-found: error
           retention-days: 30
+
+  publish:
+    name: Publish to the test catalogue
+    needs: build
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # Holds SERVER_IP/SERVER_KEY for sysweb1, the same pair deploy-test uses.
+    environment: test
+    concurrency:
+      group: publish-packages-test
+      cancel-in-progress: false
+
+    env:
+      REMOTE_USER: ci
+      # Mounted read-only into the Coffee Shop container at /pkgs (see
+      # deploy-coffeeshop-test.yml's pkg_host_dir). The backend rescans it
+      # every SCAN_INTERVAL_MS, so a new file is listed without a restart.
+      CATALOGUE_DIR: /var/www/beanweb-pkgs
+
+    steps:
+      # The artifact the build job verified and checksummed -- not a rebuild,
+      # so the sums below describe exactly these bytes.
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: packages
+          path: packages
+
+      - name: Configure SSH
+        env:
+          SERVER_KEY: ${{ secrets.SERVER_KEY }}
+          SERVER_IP: ${{ secrets.SERVER_IP }}
+        run: |
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "$SERVER_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H "$SERVER_IP" >> ~/.ssh/known_hosts
+
+      # Upload under a temporary name and rename into place, so the backend's
+      # rescan can never read a half-written .pkg. No --delete: the catalogue
+      # may hold packages not built from pkgs/, and removing one stays a
+      # deliberate act on the server.
+      - name: Upload .pkg files
+        env:
+          SERVER_IP: ${{ secrets.SERVER_IP }}
+        run: |
+          rsync -v --checksum --delay-updates --chmod=F644 \
+            -e "ssh -i ~/.ssh/deploy_key" \
+            packages/*.pkg "${REMOTE_USER}@${SERVER_IP}:${CATALOGUE_DIR}/"
+
+      - name: Verify checksums on the server
+        env:
+          SERVER_IP: ${{ secrets.SERVER_IP }}
+        run: |
+          ssh -i ~/.ssh/deploy_key "${REMOTE_USER}@${SERVER_IP}" \
+            "cd '${CATALOGUE_DIR}' && sha256sum -c -" < packages/SHA256SUMS
+
+      - name: Summary
+        run: |
+          {
+            echo '### Published to the test catalogue'
+            echo
+            echo "\`${CATALOGUE_DIR}\` on the test server. Coffee Shop lists them"
+            echo 'after its next rescan (up to ~100 s); an open Browse pane needs'
+            echo 'reopening, or *Search* with an empty box.'
+            echo
+            echo '```'
+            cat packages/SHA256SUMS
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
