@@ -22,11 +22,12 @@ and `.github/workflows/packages.yml` builds `pkgs/` into an installable
 publishes those exact files to the test server's Coffee Shop catalogue
 (`/var/www/beanweb-pkgs`), so nothing in the store was copied there by hand.
 
-Deploys are `deploy-*.yml`. Test (`beanweb-test.halicode.com`) runs on
-sysweb1 behind nginx, a host **shared with other sites**; prod is still on the
-legacy Apache box until it moves. The reusable workflows take `web_server`,
-`remote_user`, `bind_addr`, `compose_project` and `pkg_host_dir` so the two can
-differ, with defaults that keep the legacy box exactly as it was. Nothing in CI
+Deploys are `deploy-*.yml`. Test (`beanweb-test.halicode.com`) and prod
+(`beanweb.halicode.com`) both run on sysweb1 behind nginx, a host **shared
+with other sites**; prod deploys are manual. The reusable workflows take
+`web_server`, `remote_user`, `bind_addr`, `compose_project` and `pkg_host_dir`;
+their defaults still describe the legacy Apache box, kept as a way back until
+it is decommissioned. Nothing in CI
 writes to `/etc`; `deploy/README.md` is the by-hand half. On sysweb1: reload
 nginx, never restart it, and prefix every path, port and name with `beanweb`.
 

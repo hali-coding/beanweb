@@ -16,4 +16,6 @@ jobs:
     with:
       environment_name: production
       deploy_path: /var/www/beanweb/
+      remote_user: ci
+      web_server: nginx
     secrets: inherit

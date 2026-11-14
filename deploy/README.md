@@ -1,11 +1,13 @@
 # Deploying BeanWeb
 
-Two hosts during the move:
+Both targets run on **sysweb1**, a host shared with other sites:
 
-| Target | Host | Web server | Deploy user |
-|---|---|---|---|
-| test — `beanweb-test.halicode.com` | sysweb1 (shared with other sites) | nginx | `ci` |
-| prod — `beanweb.halicode.com` | legacy box | Apache2 | `github` |
+| Target | Host | Web server | Deploy user | Backend port |
+|---|---|---|---|---|
+| test — `beanweb-test.halicode.com` | sysweb1 | nginx | `ci` | `127.0.0.1:8081` |
+| prod — `beanweb.halicode.com` | sysweb1 | nginx | `ci` | `127.0.0.1:8080` |
+
+Each GitHub environment (`test`, `production`) has its own deploy key.
 
 Both domains sit behind Cloudflare's proxy. The origin IP lives in two places
 only: the Cloudflare DNS record and the GitHub environment secret `SERVER_IP`.
@@ -20,13 +22,13 @@ Check these for collisions before installing — the host is shared.
 
 | Kind | Name |
 |---|---|
-| Static roots | `/var/www/beanweb-test` (later `/var/www/beanweb`) |
-| Coffee Shop source | `/var/www/beanweb-coffeeshop-test` (later `-coffeeshop`) |
+| Static roots | `/var/www/beanweb-test`, `/var/www/beanweb` |
+| Coffee Shop source | `/var/www/beanweb-coffeeshop-test`, `/var/www/beanweb-coffeeshop` |
 | Package catalogue | `/var/www/beanweb-pkgs` (read-only mount, shared by test and prod) |
 | Ports | `127.0.0.1:8081` test, `127.0.0.1:8080` prod |
-| Compose project | `beanweb-coffeeshop-test` |
-| nginx | `sites-available/beanweb-test.conf`, logs `beanweb-test.*` |
-| Certificate | `--cert-name beanweb-test`, challenge webroot `/var/www/letsencrypt` |
+| Compose project | `beanweb-coffeeshop-test`, `beanweb-coffeeshop` |
+| nginx | `sites-available/beanweb-test.conf` and `beanweb.conf`, logs `beanweb-test.*` and `beanweb.*` |
+| Certificate | `--cert-name beanweb-test` and `beanweb`, challenge webroot `/var/www/letsencrypt` |
 | nginx snippet | `snippets/cloudflare-realip.conf` (generic, safe for other sites to include too) |
 | nginx http map | `conf.d/cloudflare-geo.conf` → `$from_cloudflare` (generic) |
 
@@ -133,14 +135,15 @@ gh secret set SERVER_KEY --env test < beanweb_test_deploy
 
 Leave the `production` secrets alone until prod moves.
 
-## Moving prod later
+## Prod
 
-Repeat the setup with `beanweb.conf` (copy of the test file: `server_name
-beanweb.halicode.com`, root `/var/www/beanweb`, port 8080, cert name
-`beanweb`), set the `production` secrets, then in `deploy-prod.yml` pass
-`remote_user: ci` and `web_server: nginx`, and in `deploy-coffeeshop-prod.yml`
-pass `remote_user: ci`, `pkg_host_dir: /var/www/beanweb-pkgs`,
-`bind_addr: 127.0.0.1` and `compose_project: beanweb-coffeeshop`. Point the
-Cloudflare record at sysweb1 last — a proxied record switches at once. Once
-nothing deploys to the legacy box, drop the `apache` branch and the
-legacy defaults from the reusable workflows.
+Prod is the same setup with `deploy/nginx/beanweb.conf` (root
+`/var/www/beanweb`, backend `127.0.0.1:8080`, cert name `beanweb`) and the
+`production` environment's own key. Both prod workflows stay manual
+(`workflow_dispatch`): `gh workflow run deploy-prod.yml` and
+`gh workflow run deploy-coffeeshop-prod.yml`.
+
+The reusable workflows still carry an `apache` branch and defaults that match
+the legacy Apache box, kept only as a way back while that box still exists.
+Once it is decommissioned, drop the branch and make the sysweb1 values the
+defaults.
