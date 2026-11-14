@@ -27,10 +27,8 @@ Check these for collisions before installing — the host is shared.
 | Package catalogue | `/var/www/beanweb-pkgs` (read-only mount, shared by test and prod) |
 | Ports | `127.0.0.1:8081` test, `127.0.0.1:8080` prod |
 | Compose project | `beanweb-coffeeshop-test`, `beanweb-coffeeshop` |
-| nginx | `sites-available/beanweb-test.conf` and `beanweb.conf`, logs `beanweb-test.*` and `beanweb.*` |
+| nginx | `sites-available/beanweb.halicode.com` and `beanweb-test.halicode.com`, logs `beanweb.*` and `beanweb-test.*` (`vhost` format) |
 | Certificate | `--cert-name beanweb-test` and `beanweb`, challenge webroot `/var/www/letsencrypt` |
-| nginx snippet | `snippets/cloudflare-realip.conf` (generic, safe for other sites to include too) |
-| nginx http map | `conf.d/cloudflare-geo.conf` → `$from_cloudflare` (generic) |
 
 ## One-time setup for test on sysweb1
 
@@ -55,71 +53,50 @@ main (`gh workflow run packages.yml --ref main`). It never deletes: a package
 dropped from `pkgs/` stays listed until someone removes the file on the
 server, which is also how a package *not* built from `pkgs/` can live there.
 
-### Cloudflare: real visitor IPs and the origin lock
+### The host layer these files depend on
 
-Two files built from the same published ranges. Re-run both when Cloudflare
-changes them -- a range missing from the lock means visitors routed through it
-get 403.
+The site files here are short because the shared parts live on sysweb1 in
+Ubuntu's own layout, maintained outside this repo (the `sysweb1` skill on the
+maintainer's machine holds the sources and the install scripts):
 
-```bash
-CF="$(curl -fsS https://www.cloudflare.com/ips-v4) $(curl -fsS https://www.cloudflare.com/ips-v6)"
+| On sysweb1 | What it does |
+|---|---|
+| `sites-available/catch-all` | the only `default_server`. Port 80 for **every** hostname: Let's Encrypt challenges, then 301 to https. Port 443 for unknown names: TLS handshake refused. Site files therefore have no port-80 block. The package's `default` site is disabled, its file left in place. |
+| `snippets/https.conf` | `listen 443 ssl` (v4 + v6), `http2 on`, challenges on 443 too |
+| `snippets/cloudflare.conf` | real visitor IPs (`snippets/cloudflare-realip.conf`) and the origin lock: 403 unless the connection came from Cloudflare's edge or loopback |
+| `snippets/static-spa.conf` / `static.conf` | SPA fallback + cache headers / plain static files |
+| `snippets/proxy.conf` | headers, HTTP/1.1 and WebSocket upgrade for a `proxy_pass` to a container |
+| `conf.d/sysweb1.conf` | `log_format vhost`, gzip types, TLS session cache, the `$connection_upgrade` map |
+| `conf.d/cloudflare-geo.conf` | the `$from_cloudflare` map. It keys on `$realip_remote_addr`: the real-IP rewrite runs before access checks, so a plain `allow`/`deny` of Cloudflare's ranges would refuse every visitor |
 
-# 1. real visitor IPs in the logs -- included per site, never in http{}
-{ for r in $CF; do echo "set_real_ip_from $r;"; done
-  echo 'real_ip_header CF-Connecting-IP;'; } \
-  | sudo tee /etc/nginx/snippets/cloudflare-realip.conf
-
-# 2. origin lock -- a variable only, so harmless to sites that never read it
-{ echo 'geo $realip_remote_addr $from_cloudflare {'
-  echo '    default 0;'; echo '    127.0.0.1/32 1;'; echo '    ::1/128 1;'
-  for r in $CF; do echo "    $r 1;"; done; echo '}'; } \
-  | sudo tee /etc/nginx/conf.d/cloudflare-geo.conf
-
-sudo nginx -t && sudo systemctl reload nginx
-```
-
-The site file refuses anything else with `if ($from_cloudflare = 0) { return
-403; }` in both server blocks -- the nginx form of the Apache `Allow from`
-list. It cannot be `allow`/`deny`: the real-IP snippet rewrites `$remote_addr`
-to the visitor before the access phase, so allow-listing Cloudflare's ranges
-there would refuse every visitor. The geo map reads `$realip_remote_addr`, the
-address that actually connected. IPv6 edge ranges are in the lock too (the
-Apache list had only IPv4), and loopback is allowed so checks on the box work.
-
-Let's Encrypt still validates: its challenge reaches the origin through
-Cloudflare like any other request (`certbot renew --dry-run` passes with the
-lock in place). Docker's published ports bypass nginx entirely, which is why
-the Coffee Shop container binds `127.0.0.1`.
+`nginx.conf` and `sites-available/default` are the package's and are not
+edited. `/root/README-letsencrypt.txt` on the box explains certificates.
 
 ### Certificate (Let's Encrypt, HTTP-01 webroot)
 
-Cloudflare passes plain-http requests through to the origin, so the challenge
-reaches nginx's port-80 block. Until the certificate exists, install only a
-port-80 server block (the 443 block cannot load without its key) that serves
-`/.well-known/acme-challenge/` from `/var/www/letsencrypt`, then:
+The catch-all answers challenges for any name, so a certificate can be issued
+as soon as the Cloudflare record points at sysweb1 -- before the site file
+exists:
 
 ```bash
-sudo mkdir -p /var/www/letsencrypt
 sudo certbot certonly --webroot -w /var/www/letsencrypt \
   --cert-name beanweb-test -d beanweb-test.halicode.com \
   --deploy-hook 'systemctl reload nginx'
-sudo certbot renew --dry-run
+sudo certbot renew --dry-run --no-random-sleep-on-renew --cert-name beanweb-test
 ```
 
-`certbot.timer` renews it. Both server blocks keep serving the challenge
-path, so renewal survives Cloudflare being switched to *Always Use HTTPS*.
-DNS-01 (`python3-certbot-dns-cloudflare`, installed) is the fallback if
-Cloudflare ever stops passing the challenge through; it needs an API token
-scoped to Zone -> DNS -> Edit on halicode.com, kept in
-`/root/.secrets/cloudflare.ini` (mode 600).
+`certbot.timer` renews it, and the deploy hook reloads nginx afterwards.
 
-### nginx
+### nginx site file
+
+`deploy/nginx/<hostname>` is installed as
+`/etc/nginx/sites-available/<hostname>` and symlinked into `sites-enabled/`,
+then `nginx -t` and a **reload** (never a restart -- other sites share this
+nginx). The skill's `install-site.sh` does exactly that, with a backup of
+`/etc/nginx` and an automatic restore if the test fails:
 
 ```bash
-sudo cp deploy/nginx/beanweb-test.conf /etc/nginx/sites-available/
-sudo ln -s ../sites-available/beanweb-test.conf /etc/nginx/sites-enabled/
-sudo nginx -t && sudo systemctl reload nginx     # reload, never restart
-curl -I --resolve beanweb-test.halicode.com:443:5.135.7.243 https://beanweb-test.halicode.com/
+install-site.sh deploy/nginx/beanweb-test.halicode.com
 ```
 
 Then set Cloudflare's SSL mode to **Full (strict)**.
@@ -137,7 +114,7 @@ Leave the `production` secrets alone until prod moves.
 
 ## Prod
 
-Prod is the same setup with `deploy/nginx/beanweb.conf` (root
+Prod is the same setup with `deploy/nginx/beanweb.halicode.com` (root
 `/var/www/beanweb`, backend `127.0.0.1:8080`, cert name `beanweb`) and the
 `production` environment's own key. Both prod workflows stay manual
 (`workflow_dispatch`): `gh workflow run deploy-prod.yml` and

@@ -68,15 +68,14 @@ root: it drops straight behind a reverse proxy alongside the static BeanWeb
 build, one origin, no CORS to reason about in production. The container
 publishes on `127.0.0.1` by default, so the proxy is its only client.
 
-nginx (sysweb1; the full site files are `deploy/nginx/beanweb.conf` and
-`beanweb-test.conf`, ports 8080 and 8081):
+nginx (sysweb1; the full site files are `deploy/nginx/beanweb.halicode.com`
+and `beanweb-test.halicode.com`, ports 8080 and 8081). The headers come from
+the host's shared `snippets/proxy.conf`:
 
 ```nginx
 location /api/coffeeshop {
-    proxy_pass http://127.0.0.1:8081;
-    proxy_set_header Host $host;
-    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-    proxy_set_header X-Forwarded-Proto $scheme;
+	proxy_pass http://127.0.0.1:8080;
+	include snippets/proxy.conf;
 }
 ```
 
